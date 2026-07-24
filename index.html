@@ -1388,6 +1388,9 @@ let editingWp = null;
 
 function openEditPopup(wp) {
   if (waypoints.indexOf(wp) < 0) return;
+  // I popup sono bound con autoClose:false: senza chiusura esplicita del
+  // precedente ne resterebbero aperti due, con id DOM duplicati
+  if (editingWp && editingWp !== wp && editingWp.marker) editingWp.marker.closePopup();
   editingWp = wp;
   const dayOptions = [
     `<option value="">— Nessuna —</option>`,
@@ -1446,7 +1449,18 @@ function quickAddDay() {
   }
 }
 
-function closeEditPopup() { map.closePopup(); }
+function closeEditPopup() {
+  if (editingWp && editingWp.marker) editingWp.marker.closePopup();
+  map.closePopup();
+}
+
+// Risolve il form dentro il popup del marker in modifica, mai via getElementById:
+// se per qualsiasi motivo esistono due popup aperti, l'id fisso sarebbe ambiguo.
+function getEditForm() {
+  const popup = editingWp && editingWp.marker ? editingWp.marker.getPopup() : null;
+  const el = popup && popup.getElement ? popup.getElement() : null;
+  return el ? el.querySelector('.edit-form') : null;
+}
 
 function deleteFromEdit() {
   const wp = editingWp;
@@ -1462,7 +1476,7 @@ function saveEdit() {
   const wp = editingWp;
   const idx = waypoints.indexOf(wp);
   if (!wp || idx < 0) return;
-  const form = document.getElementById('edit-form');
+  const form = getEditForm();
   if (!form) return;
   wp.name = form.querySelector('#ef-name').value.trim();
   wp.type = form.querySelector('#ef-type').value;
@@ -2944,16 +2958,21 @@ function importGPX(input) {
       const isAuto = name.toLowerCase().includes('auto');
       const cleanName = name.replace(/\s*\(auto\)\s*/i, '').trim();
       const type = typeFromGPX(p);
-      // Estrae giorno e nome giornata dalla desc ("Giorno N (nome) — note" del nostro export)
+      // Estrae giorno e nome giornata dalla desc del nostro export, formato
+      // "Giorno N (nome) — note". Si separa sul primo " — " e si matcha SOLO il
+      // prefisso, ancorato: così "vedi Giorno 3" dentro le note non crea giornate
+      // spurie, e un nome giornata con parentesi tipo "Elba (nord)" resta intero
+      // (il gruppo greedy si ferma all'ultima parentesi del prefisso).
       let day = null;
-      const m = desc.match(/Giorno\s+(\d+)(?:\s*\(([^)]*)\))?/i);
+      let notes = desc.trim();
+      const sepIdx = desc.indexOf(' — ');
+      const prefix = (sepIdx >= 0 ? desc.slice(0, sepIdx) : desc).trim();
+      const m = prefix.match(/^Giorno\s+(\d+)(?:\s*\((.*)\))?$/i);
       if (m) {
         day = parseInt(m[1], 10);
         if (!dayMeta.has(day)) dayMeta.set(day, (m[2] || '').trim());
+        notes = sepIdx >= 0 ? desc.slice(sepIdx + 3).trim() : '';
       }
-      // Toglie il prefisso "Giorno N (...) — " dalle note: l'export lo riaggiunge,
-      // senza strip si duplicherebbe a ogni ciclo export/import
-      const notes = desc.replace(/^Giorno\s+\d+(?:\s*\([^)]*\))?(?:\s*—\s*)?/i, '').trim();
       parsed.push({ lat, lon, isAuto, cleanName, type, day, notes });
     });
     if (!parsed.length) { alert('Nessun punto valido trovato nel file GPX'); input.value = ''; return; }
@@ -2961,6 +2980,12 @@ function importGPX(input) {
       input.value = ''; return;
     }
     const stash = stashUnnamedRoute();
+    // stashUnnamedRoute imposta currentRouteName al nome di recupero: va azzerato,
+    // altrimenti l'autosave debounced del markDirty più sotto sovrascriverebbe lo
+    // stash con il contenuto appena importato (perdendo la rotta precedente)
+    currentRouteName = null;
+    isDirty = false;
+    updateRouteNameDisplay();
     waypoints.forEach(w => map.removeLayer(w.marker));
     waypoints = [];
     // Ricrea le giornate presenti nel GPX: senza voci in days i WP con giorno
