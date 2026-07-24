@@ -464,6 +464,10 @@
         <button class="success" onclick="exportArchive()" style="flex:1">📥 Esporta tutto</button>
         <button onclick="document.getElementById('archive-import').click()" style="flex:1">📂 Importa</button>
       </div>
+      <div class="field-row">
+        <button class="success" id="btn-save-online" onclick="saveOnline()" style="flex:1">☁️ Salva online</button>
+        <button id="btn-load-online" onclick="loadOnline()" style="flex:1">☁️ Carica online</button>
+      </div>
     </section>
   </div>
 </div>
@@ -958,7 +962,7 @@ function deleteRouteFromUI(name) {
   refreshRoutesList();
 }
 
-function exportArchive() {
+function buildArchive() {
   const all = {
     version: 5,
     exportedAt: new Date().toISOString(),
@@ -968,7 +972,52 @@ function exportArchive() {
     const raw = localStorage.getItem(LS_ROUTE(name));
     if (raw) all.routes[name] = JSON.parse(raw);
   });
+  return all;
+}
+
+function exportArchive() {
+  const all = buildArchive();
   downloadFile(JSON.stringify(all, null, 2), `sailrouter_archivio_${dateStr()}.json`, 'application/json');
+}
+
+// Applica un archivio già parsato (stessa logica di conferma/sovrascrittura
+// usata sia dall'import da file sia dal caricamento online). Ritorna il numero
+// di rotte importate, oppure null se l'archivio non è valido o l'utente annulla.
+function applyArchive(data) {
+  if (!data || !data.routes) { alert('File non valido'); return null; }
+  const names = Object.keys(data.routes);
+  const existing = storage.listRoutes();
+  let conflicts = names.filter(n => existing.includes(n));
+  let mode = 'overwrite';
+  if (conflicts.length) {
+    const ans = prompt(`${conflicts.length} rotte hanno nomi che esistono già. Scrivere "ow" per sovrascrivere, "skip" per saltarle, "ren" per rinominarle automaticamente:`, 'ow');
+    if (!ans) return null;
+    if (ans === 'skip') mode = 'skip';
+    else if (ans === 'ren') mode = 'rename';
+    else mode = 'overwrite';
+  }
+  let imported = 0;
+  names.forEach(name => {
+    let finalName = name;
+    if (existing.includes(name)) {
+      if (mode === 'skip') return;
+      if (mode === 'rename') {
+        let i = 2;
+        while (existing.includes(finalName + ' (' + i + ')')) i++;
+        finalName = name + ' (' + i + ')';
+      }
+    }
+    const state = data.routes[name];
+    state.currentRouteName = finalName;
+    localStorage.setItem(LS_ROUTE(finalName), JSON.stringify(state));
+    if (!existing.includes(finalName)) existing.push(finalName);
+    // Indice aggiornato a ogni rotta: se la quota localStorage si esaurisce
+    // a metà ciclo, le rotte già scritte restano raggiungibili (niente orfani)
+    localStorage.setItem(LS_ROUTES_INDEX, JSON.stringify(existing));
+    imported++;
+  });
+  refreshRoutesList();
+  return imported;
 }
 
 function importArchive(input) {
@@ -978,46 +1027,53 @@ function importArchive(input) {
   reader.onload = (e) => {
     try {
       const data = JSON.parse(e.target.result);
-      if (!data.routes) { alert('File non valido'); return; }
-      const names = Object.keys(data.routes);
-      const existing = storage.listRoutes();
-      let conflicts = names.filter(n => existing.includes(n));
-      let mode = 'overwrite';
-      if (conflicts.length) {
-        const ans = prompt(`${conflicts.length} rotte hanno nomi che esistono già. Scrivere "ow" per sovrascrivere, "skip" per saltarle, "ren" per rinominarle automaticamente:`, 'ow');
-        if (!ans) return;
-        if (ans === 'skip') mode = 'skip';
-        else if (ans === 'ren') mode = 'rename';
-        else mode = 'overwrite';
-      }
-      let imported = 0;
-      names.forEach(name => {
-        let finalName = name;
-        if (existing.includes(name)) {
-          if (mode === 'skip') return;
-          if (mode === 'rename') {
-            let i = 2;
-            while (existing.includes(finalName + ' (' + i + ')')) i++;
-            finalName = name + ' (' + i + ')';
-          }
-        }
-        const state = data.routes[name];
-        state.currentRouteName = finalName;
-        localStorage.setItem(LS_ROUTE(finalName), JSON.stringify(state));
-        if (!existing.includes(finalName)) existing.push(finalName);
-        // Indice aggiornato a ogni rotta: se la quota localStorage si esaurisce
-        // a metà ciclo, le rotte già scritte restano raggiungibili (niente orfani)
-        localStorage.setItem(LS_ROUTES_INDEX, JSON.stringify(existing));
-        imported++;
-      });
+      const imported = applyArchive(data);
+      if (imported === null) return;
       alert(`Importate ${imported} rotte`);
-      refreshRoutesList();
       input.value = '';
     } catch (err) {
       alert('Errore importazione: ' + err.message);
     }
   };
   reader.readAsText(file);
+}
+
+// Salva l'archivio completo sul server condiviso (nginx su Unraid, PUT su
+// data/archivio.json). Notifica non bloccante su successo/errore/offline.
+async function saveOnline() {
+  const all = buildArchive();
+  try {
+    const res = await fetch('data/archivio.json', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(all, null, 2)
+    });
+    if (res.ok) {
+      const t = new Date();
+      const hh = String(t.getHours()).padStart(2, '0');
+      const mm = String(t.getMinutes()).padStart(2, '0');
+      showSaveStatus(`☁ Salvato online ${hh}:${mm}`);
+    } else {
+      showSaveStatus(`⚠ Salvataggio online fallito (${res.status})`, true);
+    }
+  } catch (err) {
+    showSaveStatus('⚠ Salvataggio online non riuscito (offline?)', true);
+  }
+}
+
+// Carica l'archivio condiviso dal server e applica le rotte con la stessa
+// logica dell'import da file (applyArchive). Notifica non bloccante su errore.
+async function loadOnline() {
+  try {
+    const res = await fetch('data/archivio.json', { cache: 'no-store' });
+    if (!res.ok) { showSaveStatus(`⚠ Caricamento online fallito (${res.status})`, true); return; }
+    const data = await res.json();
+    const imported = applyArchive(data);
+    if (imported === null) return;
+    showSaveStatus(`☁ Caricato dal server (${imported} rotte)`);
+  } catch (err) {
+    showSaveStatus('⚠ Caricamento online non riuscito (offline?)', true);
+  }
 }
 
 // ===========================================
@@ -3173,6 +3229,13 @@ window.addEventListener('load', () => {
     showSaveStatus('✓ Recuperato lavoro precedente');
   } else {
     updateAll();
+  }
+  // La sync online usa fetch relativo (data/archivio.json): non funziona da file://
+  if (location.protocol === 'file:') {
+    ['btn-save-online', 'btn-load-online'].forEach(id => {
+      const b = document.getElementById(id);
+      if (b) { b.disabled = true; b.title = 'Disponibile solo via server'; }
+    });
   }
 });
 
