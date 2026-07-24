@@ -1,0 +1,2759 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pianificatore Rotta Vela v5</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; }
+  #map { height: 100vh; width: 100%; background: #aadaff; }
+
+  .panel {
+    position: absolute; top: 12px; right: 12px; z-index: 1000;
+    background: white; border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    padding: 12px; width: 360px; max-height: calc(100vh - 24px);
+    overflow-y: auto; font-size: 14px;
+  }
+  .panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px; gap: 8px;
+  }
+  .panel-header h2 { margin: 0; font-size: 15px; flex: 1; }
+  .panel-header .route-name {
+    font-size: 11px; color: #6b7280; font-weight: 400;
+    display: block; line-height: 1.2; margin-top: 2px;
+  }
+  .panel-header .route-name.dirty::after {
+    content: ' •'; color: #f59e0b;
+  }
+
+  .top-actions {
+    display: flex; gap: 4px; margin-bottom: 10px;
+  }
+  .top-actions button {
+    flex: 1; padding: 6px 4px; border: none; border-radius: 5px;
+    font-size: 11px; font-weight: 500; cursor: pointer;
+    background: #f3f4f6; color: #374151;
+  }
+  .top-actions button:hover { background: #e5e7eb; }
+  .top-actions button.active { background: #dbeafe; color: #1e40af; }
+
+  .stats {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    padding: 8px 10px; border-radius: 6px; margin-bottom: 10px; font-size: 12px;
+  }
+  .stats .row { display: flex; justify-content: space-between; padding: 1px 0; }
+  .stats strong { color: #1e40af; font-variant-numeric: tabular-nums; }
+  .stats .warn { color: #dc2626; }
+  .stats .ok { color: #059669; }
+
+  .config {
+    background: #f9fafb; border-radius: 6px; padding: 6px 8px;
+    margin-bottom: 8px; font-size: 11px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .config label { color: #4b5563; }
+  .config input[type=number] {
+    width: 44px; padding: 2px 4px; border: 1px solid #d1d5db;
+    border-radius: 3px; font-size: 11px; font-variant-numeric: tabular-nums;
+  }
+
+  .legend {
+    display: flex; gap: 6px; flex-wrap: wrap; padding: 4px 0;
+    margin-bottom: 4px; font-size: 10px; color: #4b5563;
+  }
+  .legend .item { display: inline-flex; align-items: center; gap: 3px; }
+  .legend .swatch { width: 12px; height: 12px; display: inline-block; }
+  .legend .sw-passaggio { background: #3b82f6; border-radius: 50%; }
+  .legend .sw-rada { background: #10b981; border-radius: 50%; }
+  .legend .sw-porto { background: #1e3a8a; border-radius: 3px; }
+  .legend .sw-poi { background: #7c3aed; transform: rotate(45deg); border-radius: 2px; }
+  .legend .sw-auto { background: #f59e0b; border-radius: 50%; border: 2px dashed #b45309; }
+
+  .day-group {
+    margin-bottom: 6px;
+  }
+  .day-header {
+    background: #f0f9ff;
+    border-left: 3px solid #0284c7;
+    padding: 6px 8px; border-radius: 4px;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px;
+  }
+  .day-header:hover { background: #e0f2fe; }
+  .day-header.unassigned {
+    background: #f3f4f6; border-left-color: #9ca3af;
+  }
+  .day-header.unassigned:hover { background: #e5e7eb; }
+  .day-header .day-title { flex: 1; font-weight: 600; color: #0c4a6e; }
+  .day-header.unassigned .day-title { color: #4b5563; font-style: italic; }
+  .day-header .day-stats { font-size: 10px; color: #075985; font-variant-numeric: tabular-nums; }
+  .day-header.unassigned .day-stats { color: #6b7280; }
+  .day-header .toggle { width: 14px; text-align: center; color: #0284c7; transition: transform 0.15s; }
+  .day-group.collapsed .toggle { transform: rotate(-90deg); }
+  .day-group.collapsed .waypoints { display: none; }
+
+  .waypoints {
+    list-style: none; padding: 0; margin: 4px 0 0 0;
+  }
+  .waypoints li {
+    display: flex; align-items: flex-start; gap: 6px;
+    padding: 6px 8px; background: #f9fafb;
+    border-radius: 5px; margin-bottom: 3px;
+    font-size: 12px; border-left: 3px solid #3b82f6;
+  }
+  .waypoints li.t-rada { border-left-color: #10b981; }
+  .waypoints li.t-porto { border-left-color: #1e3a8a; }
+  .waypoints li.t-poi { border-left-color: #7c3aed; }
+  .waypoints li.is-auto { background: #fffbeb; }
+  .waypoints li .info { flex: 1; line-height: 1.35; min-width: 0; }
+  .waypoints li .info .header {
+    display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+  }
+  .waypoints li .info strong { color: #1e40af; }
+  .waypoints li .info .name { font-weight: 600; color: #111827; }
+  .waypoints li .info small { color: #6b7280; display: block; }
+  .waypoints li .info .seg { color: #059669; font-weight: 500; }
+  .waypoints li .info .from-dest {
+    display: block;
+    font-size: 10px;
+    color: #0284c7;
+    background: #f0f9ff;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-top: 3px;
+    font-weight: 500;
+  }
+  .waypoints li .info .type-badge {
+    padding: 1px 5px; border-radius: 3px; font-size: 9px;
+    font-weight: 600; text-transform: uppercase; color: white; background: #3b82f6;
+  }
+  .waypoints li.t-rada .info .type-badge { background: #10b981; }
+  .waypoints li.t-porto .info .type-badge { background: #1e3a8a; }
+  .waypoints li.t-poi .info .type-badge { background: #7c3aed; }
+  .waypoints li .info .auto-tag {
+    background: #fef3c7; color: #92400e;
+    padding: 1px 4px; border-radius: 3px; font-size: 9px; font-weight: 600;
+  }
+  .waypoints li .info .depth {
+    display: inline-block; background: #e0f2fe; color: #075985;
+    padding: 1px 5px; border-radius: 3px; margin-top: 3px;
+    font-weight: 500; font-variant-numeric: tabular-nums;
+  }
+  .waypoints li .info .depth.shallow { background: #fef3c7; color: #92400e; }
+  .waypoints li .info .depth.deep { background: #dbeafe; color: #1e40af; }
+  .waypoints li .info .depth.loading { background: #f3f4f6; color: #9ca3af; }
+  .waypoints li .info .depth.na { background: #fee2e2; color: #991b1b; }
+  .waypoints li .actions-mini { display: flex; flex-direction: column; gap: 2px; }
+  .waypoints li button {
+    border: none; border-radius: 4px; width: 22px; height: 22px;
+    cursor: pointer; font-size: 12px; line-height: 1; flex-shrink: 0;
+  }
+  .waypoints li button.edit { background: #dbeafe; color: #1e40af; }
+  .waypoints li button.edit:hover { background: #bfdbfe; }
+  .waypoints li button.del { background: #fee2e2; color: #991b1b; }
+  .waypoints li button.del:hover { background: #fecaca; }
+
+  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 6px; }
+  .actions button, .actions select {
+    padding: 8px 6px; background: #2563eb; color: white; border: none;
+    border-radius: 5px; cursor: pointer; font-size: 12px; font-weight: 500;
+    font-family: inherit;
+  }
+  .actions select { padding: 7px 6px; appearance: none; -webkit-appearance: none; }
+  .actions button:hover:not(:disabled), .actions select:hover { background: #1d4ed8; }
+  .actions button:disabled { background: #d1d5db; cursor: not-allowed; }
+  .actions button.danger { background: #ef4444; }
+  .actions button.danger:hover:not(:disabled) { background: #dc2626; }
+  .actions button.secondary, .actions select.secondary { background: #6b7280; }
+  .actions button.secondary:hover:not(:disabled), .actions select.secondary:hover { background: #4b5563; }
+  .actions button.success { background: #10b981; }
+  .actions button.success:hover:not(:disabled) { background: #059669; }
+  .actions button.warning { background: #f59e0b; }
+  .actions button.warning:hover:not(:disabled) { background: #d97706; }
+
+  .progress {
+    background: #f3f4f6; height: 4px; border-radius: 2px;
+    margin: 6px 0; overflow: hidden; display: none;
+  }
+  .progress.active { display: block; }
+  .progress-bar { background: #2563eb; height: 100%; transition: width 0.2s; width: 0%; }
+
+  .log {
+    font-size: 11px; color: #4b5563; margin-top: 6px;
+    max-height: 80px; overflow-y: auto; padding: 6px 8px;
+    background: #f9fafb; border-radius: 4px; font-family: ui-monospace, monospace;
+  }
+  .log .ok { color: #059669; }
+  .log .warn { color: #d97706; }
+  .log .err { color: #dc2626; }
+
+  .hint {
+    font-size: 11px; color: #6b7280; margin-top: 10px; line-height: 1.5;
+    padding: 8px; background: #fef3c7; border: 1px solid #fde68a;
+    border-radius: 4px;
+  }
+  .hint strong { color: #92400e; }
+
+  .empty { color: #9ca3af; text-align: center; padding: 20px 8px; font-size: 12px; }
+
+  /* MARKER ICON */
+  .marker-icon-wrapper {
+    position: relative; width: 28px; height: 28px;
+  }
+  .marker-icon {
+    width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: white;
+    border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+  }
+  .marker-icon .num { display: block; }
+  .marker-icon.t-passaggio { background: #3b82f6; border-radius: 50%; }
+  .marker-icon.t-rada { background: #10b981; border-radius: 50%; }
+  .marker-icon.t-porto { background: #1e3a8a; border-radius: 4px; }
+  .marker-icon.t-poi {
+    background: #7c3aed; transform: rotate(45deg); border-radius: 4px;
+    width: 26px; height: 26px;
+  }
+  .marker-icon.t-poi .num { transform: rotate(-45deg); }
+  .marker-icon.is-auto {
+    border-color: #f59e0b; border-style: dashed; border-width: 3px;
+  }
+  .marker-day-badge {
+    position: absolute; top: -6px; right: -6px;
+    background: #0284c7; color: white;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    border: 1.5px solid white;
+    font-size: 9px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    z-index: 2;
+  }
+
+  /* POPUP edit */
+  .edit-form { font-family: inherit; font-size: 13px; min-width: 240px; }
+  .edit-form label { display: block; margin-bottom: 8px; color: #374151; font-size: 12px; }
+  .edit-form input, .edit-form select, .edit-form textarea {
+    width: 100%; padding: 5px 6px; border: 1px solid #d1d5db;
+    border-radius: 4px; font-size: 13px; font-family: inherit; margin-top: 2px;
+  }
+  .edit-form textarea { resize: vertical; min-height: 50px; }
+  .edit-form .btn-row { display: flex; gap: 6px; }
+  .edit-form button {
+    flex: 1; padding: 6px; border: none; border-radius: 4px;
+    cursor: pointer; font-size: 12px; font-weight: 500;
+  }
+  .edit-form button.save { background: #10b981; color: white; }
+  .edit-form button.cancel { background: #e5e7eb; color: #374151; }
+  .edit-form button.delete { background: #fee2e2; color: #991b1b; flex: 0 0 auto; padding: 6px 10px; }
+  .edit-form button.delete:hover { background: #fecaca; }
+
+  /* MODALE */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    z-index: 2000; display: none;
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: white; border-radius: 10px; padding: 18px;
+    width: 90%; max-width: 480px; max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  }
+  .modal h3 {
+    margin: 0 0 12px 0; font-size: 16px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .modal h3 .close {
+    cursor: pointer; color: #9ca3af; font-size: 22px; line-height: 1;
+    background: none; border: none; padding: 0;
+  }
+  .modal h3 .close:hover { color: #374151; }
+  .modal section { margin-bottom: 14px; }
+  .modal section h4 {
+    margin: 0 0 6px 0; font-size: 13px;
+    color: #374151; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .modal .field-row {
+    display: flex; gap: 6px; margin-bottom: 6px;
+  }
+  .modal .field-row input,
+  .modal .field-row select {
+    flex: 1; padding: 6px 8px; border: 1px solid #d1d5db;
+    border-radius: 5px; font-size: 13px; font-family: inherit;
+  }
+  .modal .field-row button {
+    padding: 6px 12px; border: none; border-radius: 5px;
+    cursor: pointer; font-size: 12px; font-weight: 500;
+    background: #2563eb; color: white;
+  }
+  .modal .field-row button:hover { background: #1d4ed8; }
+  .modal .field-row button.success { background: #10b981; }
+  .modal .field-row button.success:hover { background: #059669; }
+
+  .item-list {
+    list-style: none; padding: 0; margin: 0;
+    border: 1px solid #e5e7eb; border-radius: 6px;
+    max-height: 280px; overflow-y: auto;
+  }
+  .item-list li {
+    padding: 8px 10px; border-bottom: 1px solid #f3f4f6;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px;
+  }
+  .item-list li:last-child { border-bottom: none; }
+  .item-list li.current { background: #eff6ff; }
+  .item-list li .item-info { flex: 1; min-width: 0; }
+  .item-list li .item-info strong { display: block; }
+  .item-list li .item-info small { display: block; color: #6b7280; font-size: 11px; }
+  .item-list li .item-actions { display: flex; gap: 4px; }
+  .item-list li .item-actions button {
+    border: none; border-radius: 4px; padding: 4px 8px;
+    cursor: pointer; font-size: 11px;
+  }
+  .item-list li .item-actions button.load { background: #dbeafe; color: #1e40af; }
+  .item-list li .item-actions button.load:hover { background: #bfdbfe; }
+  .item-list li .item-actions button.rename { background: #f3f4f6; color: #374151; }
+  .item-list li .item-actions button.rename:hover { background: #e5e7eb; }
+  .item-list li .item-actions button.del { background: #fee2e2; color: #991b1b; }
+  .item-list li .item-actions button.del:hover { background: #fecaca; }
+  .item-list .empty-list { padding: 20px; text-align: center; color: #9ca3af; font-size: 12px; }
+
+  .save-status {
+    font-size: 11px; color: #059669; padding: 4px 0;
+    text-align: center; transition: opacity 0.3s;
+  }
+  .save-status.fade { opacity: 0; }
+  .save-status.error { color: #dc2626; }
+
+  @media (max-width: 600px) {
+    .panel { width: calc(100% - 24px); max-height: 50vh; }
+    .modal { max-width: 95%; padding: 14px; }
+  }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="panel" id="panel">
+  <div class="panel-header">
+    <h2>
+      ⚓ Rotta Vela
+      <span class="route-name" id="route-name-display">— rotta non salvata</span>
+    </h2>
+  </div>
+
+  <div class="top-actions">
+    <button onclick="openRoutesModal()">📁 Rotte</button>
+    <button onclick="openDaysModal()">🗓 Giornate</button>
+    <button onclick="newRoute()">+ Nuova</button>
+  </div>
+
+  <div class="stats">
+    <div class="row"><span>Waypoints / Giornate</span><strong><span id="wp-count">0</span> / <span id="day-count">0</span></strong></div>
+    <div class="row"><span>Distanza totale</span><strong id="total-nm">0,00 nm</strong></div>
+    <div class="row"><span>Stato rotta</span><strong id="route-status">non verificata</strong></div>
+  </div>
+
+  <div class="config">
+    <label>Prof. min:</label>
+    <input type="number" id="min-depth" value="10" min="2" max="50" step="1">
+    <span>m</span>
+    <label>Velocità:</label>
+    <input type="number" id="cruise-speed" value="6" min="3" max="15" step="0.5">
+    <span>kn</span>
+    <label style="margin-left:auto">Risol.:</label>
+    <input type="number" id="samples-density" value="3" min="1" max="10" step="1">
+    <span>/nm</span>
+  </div>
+
+  <div class="legend">
+    <span class="item"><span class="swatch sw-passaggio"></span>Passaggio</span>
+    <span class="item"><span class="swatch sw-rada"></span>Rada</span>
+    <span class="item"><span class="swatch sw-porto"></span>Porto</span>
+    <span class="item"><span class="swatch sw-poi"></span>POI</span>
+    <span class="item"><span class="swatch sw-auto"></span>Auto</span>
+  </div>
+
+  <div id="day-groups">
+    <div class="empty">Click sulla mappa per iniziare</div>
+  </div>
+
+  <div class="actions">
+    <button onclick="undoLast()">↶ Annulla</button>
+    <button class="danger" onclick="clearAll()">🗑 Pulisci</button>
+  </div>
+  <div class="actions">
+    <button class="success" onclick="validateRoute()" id="btn-validate">🔍 Verifica</button>
+    <button class="warning" onclick="autoCorrect()" id="btn-correct" disabled>🔧 Auto-correz.</button>
+  </div>
+  <div class="actions">
+    <button class="secondary" onclick="document.getElementById('gpx-import').click()">📂 Importa GPX</button>
+    <select class="secondary" id="export-menu" onchange="handleExport(this.value)">
+      <option value="">📥 Esporta...</option>
+      <option value="gpx">GPX (chartplotter)</option>
+      <option value="json">JSON (analisi AI)</option>
+      <option value="csv">CSV (Excel)</option>
+      <option value="md">Markdown (tabella)</option>
+      <option value="pdf">PDF (stampa)</option>
+    </select>
+  </div>
+
+  <div class="save-status" id="save-status"></div>
+
+  <div class="progress" id="progress"><div class="progress-bar" id="progress-bar"></div></div>
+  <div class="log" id="log" style="display:none"></div>
+
+  <input type="file" id="gpx-import" accept=".gpx,application/gpx+xml" style="display:none" onchange="importGPX(this)">
+  <input type="file" id="archive-import" accept=".json,application/json" style="display:none" onchange="importArchive(this)">
+
+  <div class="hint">
+    <strong>⚠ Avvertenza</strong><br>
+    L'auto-correzione è euristica e EMODnet ha risoluzione ~250 m. Verifica sempre la rotta a vista, soprattutto sotto costa.
+  </div>
+</div>
+
+<!-- MODALE ROTTE -->
+<div class="modal-overlay" id="modal-routes">
+  <div class="modal">
+    <h3>📁 Gestione rotte
+      <button class="close" onclick="closeModal('modal-routes')">×</button>
+    </h3>
+    <section>
+      <h4>Rotta corrente</h4>
+      <div class="field-row">
+        <input type="text" id="route-save-name" placeholder="Nome rotta (es. Dalmazia W1)">
+        <button class="success" onclick="saveCurrentRouteAs()">💾 Salva</button>
+      </div>
+      <small style="color: #6b7280; font-size: 11px;" id="current-route-info">Lavoro in corso (auto-salvato)</small>
+    </section>
+
+    <section>
+      <h4>Rotte salvate</h4>
+      <ul class="item-list" id="routes-list"></ul>
+    </section>
+
+    <section>
+      <h4>Backup</h4>
+      <div class="field-row">
+        <button class="success" onclick="exportArchive()" style="flex:1">📥 Esporta tutto</button>
+        <button onclick="document.getElementById('archive-import').click()" style="flex:1">📂 Importa</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- MODALE GIORNATE -->
+<div class="modal-overlay" id="modal-days">
+  <div class="modal">
+    <h3>🗓 Gestione giornate
+      <button class="close" onclick="closeModal('modal-days')">×</button>
+    </h3>
+    <section>
+      <h4>Aggiungi giornata</h4>
+      <div class="field-row">
+        <input type="date" id="new-day-date" title="Data">
+        <input type="text" id="new-day-name" placeholder="Nome (es. Trogir → Vis)">
+        <button class="success" onclick="addDay()">+ Aggiungi</button>
+      </div>
+    </section>
+
+    <section>
+      <h4>Giornate</h4>
+      <ul class="item-list" id="days-list"></ul>
+    </section>
+
+    <section>
+      <small style="color: #6b7280; font-size: 11px;">
+        Per assegnare un waypoint a una giornata, clicca sul marker (o sul ✎ nella lista) e seleziona la giornata.
+      </small>
+    </section>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<script>
+// ===========================================
+// CONFIGURAZIONE
+// ===========================================
+const EMODNET_REST = 'https://rest.emodnet-bathymetry.eu/depth/point';
+const DETOUR_OFFSETS_NM = [0.3, 0.6, 1, 1.5, 2.5, 4, 6, 10];
+const TYPE_INFO = {
+  passaggio: { label: 'Passaggio', color: '#3b82f6', shape: 'circle' },
+  rada:      { label: 'Rada',      color: '#10b981', shape: 'circle' },
+  porto:     { label: 'Porto',     color: '#1e3a8a', shape: 'square' },
+  poi:       { label: 'POI',       color: '#7c3aed', shape: 'diamond' }
+};
+const TYPE_KEYS = Object.keys(TYPE_INFO);
+
+const LS_PREFIX = 'sailrouter:';
+const LS_AUTOSAVE = LS_PREFIX + 'autosave';
+const LS_ROUTES_INDEX = LS_PREFIX + 'routes:index';
+const LS_ROUTE = (name) => LS_PREFIX + 'route:' + name;
+const LS_CURRENT = LS_PREFIX + 'current';
+
+function getMinDepth() { return parseFloat(document.getElementById('min-depth').value) || 10; }
+function getSamplesDensity() { return parseFloat(document.getElementById('samples-density').value) || 3; }
+function getCruiseSpeed() { return parseFloat(document.getElementById('cruise-speed').value) || 6; }
+
+function formatTime(hours) {
+  if (!isFinite(hours) || hours < 0) return '—';
+  if (hours < 1/120) return '< 1m';
+  const totalMin = Math.round(hours * 60);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${String(m).padStart(2, '0')}m`;
+}
+function timeFromNm(nm) { return nm / getCruiseSpeed(); }
+
+// ===========================================
+// MAPPA
+// ===========================================
+const map = L.map('map', { zoomControl: true }).setView([42.5, 11.5], 6);
+const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 });
+const osmHot = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', { attribution: '© OSM France', maxZoom: 19 });
+const esriSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri Imagery', maxZoom: 19 });
+const esriOcean = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri Ocean', maxZoom: 13 });
+const seamarks = L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', { attribution: '© OpenSeaMap', maxZoom: 18, opacity: 0.9 });
+const emodnetDepth = L.tileLayer.wms('https://ows.emodnet-bathymetry.eu/wms', {
+  layers: 'emodnet:mean_multicolour', format: 'image/png', transparent: true,
+  attribution: '© EMODnet', opacity: 0.6, version: '1.3.0'
+});
+const emodnetContours = L.tileLayer.wms('https://ows.emodnet-bathymetry.eu/wms', {
+  layers: 'emodnet:contours', format: 'image/png', transparent: true,
+  attribution: '© EMODnet', version: '1.3.0'
+});
+osm.addTo(map);
+seamarks.addTo(map);
+L.control.layers(
+  { 'OpenStreetMap': osm, 'OSM Topo': osmHot, 'Satellite': esriSat, 'Ocean Base': esriOcean },
+  { 'Profondità (EMODnet)': emodnetDepth, 'Isobate (EMODnet)': emodnetContours, 'Boe & Fari': seamarks },
+  { position: 'topleft', collapsed: true }
+).addTo(map);
+
+// ===========================================
+// STATO
+// ===========================================
+// waypoints[i] = { marker, latlng, depth, auto, type, name, notes, day }
+// segments[i] = { polyline, status, minDepth }
+// days = [{ number, date, name, notes }]
+let waypoints = [];
+let segments = [];
+let days = [];
+let depthCache = new Map();
+
+let currentRouteName = null;   // null = non salvata, altrimenti nome
+let isDirty = false;
+let collapsedDays = new Set(); // giorni collassati nella sidebar (per indice)
+
+let saveStatusTimer = null;
+let autoSaveDebounceTimer = null;
+
+// ===========================================
+// HELPERS GEOMETRIA
+// ===========================================
+const R_KM = 6371;
+function toRad(d) { return d * Math.PI / 180; }
+function toDeg(r) { return r * 180 / Math.PI; }
+function distanceKm(a, b) {
+  const dLat = toRad(b.lat - a.lat), dLon = toRad(b.lng - a.lng);
+  const φ1 = toRad(a.lat), φ2 = toRad(b.lat);
+  const x = Math.sin(dLat/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(dLon/2)**2;
+  return R_KM * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
+}
+function distanceNm(a, b) { return distanceKm(a, b) / 1.852; }
+function bearing(a, b) {
+  const φ1 = toRad(a.lat), φ2 = toRad(b.lat);
+  const Δλ = toRad(b.lng - a.lng);
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1)*Math.sin(φ2) - Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+function destination(start, bearingDeg, distanceKmVal) {
+  const δ = distanceKmVal / R_KM;
+  const θ = toRad(bearingDeg);
+  const φ1 = toRad(start.lat), λ1 = toRad(start.lng);
+  const φ2 = Math.asin(Math.sin(φ1)*Math.cos(δ) + Math.cos(φ1)*Math.sin(δ)*Math.cos(θ));
+  const λ2 = λ1 + Math.atan2(Math.sin(θ)*Math.sin(δ)*Math.cos(φ1), Math.cos(δ) - Math.sin(φ1)*Math.sin(φ2));
+  return L.latLng(toDeg(φ2), ((toDeg(λ2) + 540) % 360) - 180);
+}
+function midpoint(a, b) { return L.latLng((a.lat + b.lat)/2, (a.lng + b.lng)/2); }
+function fmt(n, dec=2) {
+  if (n === null || n === undefined || isNaN(n)) return '—';
+  return n.toLocaleString('it-IT', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+function escapeHtml(s) {
+  if (!s) return '';
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function downloadFile(content, filename, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function dateStr() { return new Date().toISOString().slice(0,10); }
+
+// ===========================================
+// PERSISTENZA (localStorage)
+// ===========================================
+const storage = {
+  serializeState() {
+    return {
+      version: 5,
+      savedAt: new Date().toISOString(),
+      currentRouteName,
+      days: days.map(d => ({ ...d })),
+      waypoints: waypoints.map(w => ({
+        lat: w.latlng.lat,
+        lng: w.latlng.lng,
+        type: w.type,
+        name: w.name,
+        notes: w.notes,
+        auto: w.auto,
+        depth: w.depth === undefined ? null : w.depth,
+        day: w.day
+      })),
+      config: {
+        minDepth: getMinDepth(),
+        samplesDensity: getSamplesDensity(),
+        cruiseSpeed: getCruiseSpeed()
+      }
+    };
+  },
+
+  deserializeState(state, opts={}) {
+    if (!state) return false;
+    // Pulisci stato corrente
+    waypoints.forEach(w => map.removeLayer(w.marker));
+    waypoints = [];
+    rebuildSegments();
+    days = (state.days || []).map(d => ({ ...d }));
+    if (opts.setRouteName !== undefined) {
+      currentRouteName = opts.setRouteName;
+    } else {
+      currentRouteName = state.currentRouteName || null;
+    }
+    // Ricrea waypoint (skipSave per evitare cascade di autosave)
+    (state.waypoints || []).forEach(w => {
+      insertWaypointAt(L.latLng(w.lat, w.lng), waypoints.length, {
+        auto: w.auto,
+        type: w.type,
+        name: w.name,
+        notes: w.notes,
+        day: w.day !== undefined ? w.day : null,
+        skipDepthFetch: w.depth !== null && w.depth !== undefined,
+        prefillDepth: w.depth
+      }, true);
+    });
+    // Config
+    if (state.config) {
+      if (state.config.minDepth) document.getElementById('min-depth').value = state.config.minDepth;
+      if (state.config.samplesDensity) document.getElementById('samples-density').value = state.config.samplesDensity;
+      if (state.config.cruiseSpeed) document.getElementById('cruise-speed').value = state.config.cruiseSpeed;
+    }
+    if (waypoints.length) {
+      const bounds = L.latLngBounds(waypoints.map(w => w.latlng));
+      map.fitBounds(bounds, { padding: [40, 40] });
+    }
+    isDirty = false;
+    updateRouteNameDisplay();
+    updateAll();
+    return true;
+  },
+
+  autoSave() {
+    try {
+      localStorage.setItem(LS_AUTOSAVE, JSON.stringify(this.serializeState()));
+      return true;
+    } catch (e) {
+      console.error('Auto-save fallito', e);
+      return false;
+    }
+  },
+
+  loadAutoSave() {
+    try {
+      const raw = localStorage.getItem(LS_AUTOSAVE);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch (e) { return null; }
+  },
+
+  listRoutes() {
+    try {
+      const raw = localStorage.getItem(LS_ROUTES_INDEX);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) { return []; }
+  },
+
+  saveRoute(name) {
+    try {
+      const state = this.serializeState();
+      state.currentRouteName = name;
+      localStorage.setItem(LS_ROUTE(name), JSON.stringify(state));
+      const idx = this.listRoutes();
+      if (!idx.includes(name)) {
+        idx.push(name);
+        localStorage.setItem(LS_ROUTES_INDEX, JSON.stringify(idx));
+      }
+      currentRouteName = name;
+      isDirty = false;
+      updateRouteNameDisplay();
+      this.autoSave();
+      return true;
+    } catch (e) {
+      console.error('Save fallito', e);
+      return false;
+    }
+  },
+
+  loadRoute(name) {
+    try {
+      const raw = localStorage.getItem(LS_ROUTE(name));
+      if (!raw) return null;
+      const state = JSON.parse(raw);
+      this.deserializeState(state, { setRouteName: name });
+      return state;
+    } catch (e) {
+      console.error('Load fallito', e);
+      return null;
+    }
+  },
+
+  deleteRoute(name) {
+    try {
+      localStorage.removeItem(LS_ROUTE(name));
+      const idx = this.listRoutes().filter(n => n !== name);
+      localStorage.setItem(LS_ROUTES_INDEX, JSON.stringify(idx));
+      if (currentRouteName === name) currentRouteName = null;
+      updateRouteNameDisplay();
+      return true;
+    } catch (e) { return false; }
+  },
+
+  renameRoute(oldName, newName) {
+    try {
+      const raw = localStorage.getItem(LS_ROUTE(oldName));
+      if (!raw) return false;
+      const state = JSON.parse(raw);
+      state.currentRouteName = newName;
+      localStorage.setItem(LS_ROUTE(newName), JSON.stringify(state));
+      localStorage.removeItem(LS_ROUTE(oldName));
+      const idx = this.listRoutes().map(n => n === oldName ? newName : n);
+      localStorage.setItem(LS_ROUTES_INDEX, JSON.stringify(idx));
+      if (currentRouteName === oldName) currentRouteName = newName;
+      updateRouteNameDisplay();
+      return true;
+    } catch (e) { return false; }
+  },
+
+  getRouteMetadata(name) {
+    try {
+      const raw = localStorage.getItem(LS_ROUTE(name));
+      if (!raw) return null;
+      const s = JSON.parse(raw);
+      return {
+        savedAt: s.savedAt,
+        waypointCount: (s.waypoints || []).length,
+        dayCount: (s.days || []).length
+      };
+    } catch (e) { return null; }
+  }
+};
+
+function showSaveStatus(msg, isError=false) {
+  const el = document.getElementById('save-status');
+  el.textContent = msg;
+  el.className = 'save-status' + (isError ? ' error' : '');
+  if (saveStatusTimer) clearTimeout(saveStatusTimer);
+  saveStatusTimer = setTimeout(() => {
+    el.classList.add('fade');
+    setTimeout(() => { el.textContent = ''; el.classList.remove('fade'); }, 300);
+  }, 1500);
+}
+
+function markDirty() {
+  isDirty = true;
+  updateRouteNameDisplay();
+  // Auto-save su slot autosave + sulla rotta corrente (debounced)
+  if (autoSaveDebounceTimer) clearTimeout(autoSaveDebounceTimer);
+  autoSaveDebounceTimer = setTimeout(() => {
+    const ok = storage.autoSave();
+    if (currentRouteName && ok) {
+      storage.saveRoute(currentRouteName);
+      showSaveStatus('✓ Salvato in "' + currentRouteName + '"');
+    } else if (ok) {
+      showSaveStatus('✓ Auto-salvato');
+    } else {
+      showSaveStatus('⚠ Salvataggio fallito', true);
+    }
+  }, 800);
+}
+
+function updateRouteNameDisplay() {
+  const el = document.getElementById('route-name-display');
+  if (currentRouteName) {
+    el.textContent = '📁 ' + currentRouteName;
+  } else {
+    el.textContent = '— rotta non salvata';
+  }
+  el.classList.toggle('dirty', isDirty);
+}
+
+function newRoute() {
+  if (waypoints.length && !confirm('Iniziare una nuova rotta? La rotta corrente è auto-salvata e potrai recuperarla dal menu Rotte.')) return;
+  // Salva eventuali modifiche
+  if (currentRouteName && isDirty) storage.saveRoute(currentRouteName);
+  waypoints.forEach(w => map.removeLayer(w.marker));
+  waypoints = [];
+  days = [];
+  rebuildSegments();
+  currentRouteName = null;
+  isDirty = false;
+  updateRouteNameDisplay();
+  updateAll();
+  storage.autoSave();
+}
+
+// ===========================================
+// MODAL HELPERS
+// ===========================================
+function openModal(id) { document.getElementById(id).classList.add('show'); }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+function openRoutesModal() {
+  document.getElementById('route-save-name').value = currentRouteName || '';
+  document.getElementById('current-route-info').textContent = currentRouteName
+    ? `Stai modificando "${currentRouteName}"`
+    : 'Lavoro in corso (auto-salvato in background)';
+  refreshRoutesList();
+  openModal('modal-routes');
+}
+
+function refreshRoutesList() {
+  const list = document.getElementById('routes-list');
+  const names = storage.listRoutes();
+  if (!names.length) {
+    list.innerHTML = '<li class="empty-list">Nessuna rotta salvata</li>';
+    return;
+  }
+  list.innerHTML = '';
+  names.sort().forEach(name => {
+    const meta = storage.getRouteMetadata(name);
+    const li = document.createElement('li');
+    if (name === currentRouteName) li.className = 'current';
+    const dateStr = meta?.savedAt ? new Date(meta.savedAt).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' }) : '';
+    li.innerHTML = `
+      <div class="item-info">
+        <strong>${escapeHtml(name)}</strong>
+        <small>${meta?.waypointCount || 0} WP, ${meta?.dayCount || 0} giorni · ${dateStr}</small>
+      </div>
+      <div class="item-actions">
+        <button class="load" onclick="loadRouteFromUI('${escapeHtml(name).replace(/'/g, '\\\'')}')">Carica</button>
+        <button class="rename" onclick="renameRouteFromUI('${escapeHtml(name).replace(/'/g, '\\\'')}')">✎</button>
+        <button class="del" onclick="deleteRouteFromUI('${escapeHtml(name).replace(/'/g, '\\\'')}')">×</button>
+      </div>
+    `;
+    list.appendChild(li);
+  });
+}
+
+function saveCurrentRouteAs() {
+  const name = document.getElementById('route-save-name').value.trim();
+  if (!name) { alert('Inserisci un nome'); return; }
+  if (storage.listRoutes().includes(name) && name !== currentRouteName) {
+    if (!confirm(`Esiste già una rotta "${name}". Sovrascrivere?`)) return;
+  }
+  if (storage.saveRoute(name)) {
+    showSaveStatus('✓ Salvato come "' + name + '"');
+    refreshRoutesList();
+    closeModal('modal-routes');
+  } else {
+    alert('Salvataggio fallito');
+  }
+}
+
+function loadRouteFromUI(name) {
+  if (waypoints.length && isDirty && !confirm('Caricare questa rotta? La corrente verrà sostituita (è auto-salvata).')) return;
+  if (currentRouteName && isDirty) storage.saveRoute(currentRouteName);
+  if (storage.loadRoute(name)) {
+    showSaveStatus('✓ Caricata "' + name + '"');
+    closeModal('modal-routes');
+  } else {
+    alert('Caricamento fallito');
+  }
+}
+
+function renameRouteFromUI(name) {
+  const newName = prompt('Nuovo nome per "' + name + '":', name);
+  if (!newName || newName === name) return;
+  if (storage.listRoutes().includes(newName)) {
+    alert('Esiste già una rotta con questo nome');
+    return;
+  }
+  if (storage.renameRoute(name, newName)) {
+    refreshRoutesList();
+  }
+}
+
+function deleteRouteFromUI(name) {
+  if (!confirm(`Eliminare la rotta "${name}"? Operazione irreversibile.`)) return;
+  storage.deleteRoute(name);
+  refreshRoutesList();
+}
+
+function exportArchive() {
+  const all = {
+    version: 5,
+    exportedAt: new Date().toISOString(),
+    routes: {}
+  };
+  storage.listRoutes().forEach(name => {
+    const raw = localStorage.getItem(LS_ROUTE(name));
+    if (raw) all.routes[name] = JSON.parse(raw);
+  });
+  downloadFile(JSON.stringify(all, null, 2), `sailrouter_archivio_${dateStr()}.json`, 'application/json');
+}
+
+function importArchive(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.routes) { alert('File non valido'); return; }
+      const names = Object.keys(data.routes);
+      const existing = storage.listRoutes();
+      let conflicts = names.filter(n => existing.includes(n));
+      let mode = 'overwrite';
+      if (conflicts.length) {
+        const ans = prompt(`${conflicts.length} rotte hanno nomi che esistono già. Scrivere "ow" per sovrascrivere, "skip" per saltarle, "ren" per rinominarle automaticamente:`, 'ow');
+        if (!ans) return;
+        if (ans === 'skip') mode = 'skip';
+        else if (ans === 'ren') mode = 'rename';
+        else mode = 'overwrite';
+      }
+      let imported = 0;
+      names.forEach(name => {
+        let finalName = name;
+        if (existing.includes(name)) {
+          if (mode === 'skip') return;
+          if (mode === 'rename') {
+            let i = 2;
+            while (existing.includes(finalName + ' (' + i + ')')) i++;
+            finalName = name + ' (' + i + ')';
+          }
+        }
+        const state = data.routes[name];
+        state.currentRouteName = finalName;
+        localStorage.setItem(LS_ROUTE(finalName), JSON.stringify(state));
+        if (!existing.includes(finalName)) existing.push(finalName);
+        imported++;
+      });
+      localStorage.setItem(LS_ROUTES_INDEX, JSON.stringify(existing));
+      alert(`Importate ${imported} rotte`);
+      refreshRoutesList();
+      input.value = '';
+    } catch (err) {
+      alert('Errore importazione: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ===========================================
+// GIORNATE
+// ===========================================
+function openDaysModal() {
+  refreshDaysList();
+  // Pre-fill date input
+  document.getElementById('new-day-date').value = '';
+  document.getElementById('new-day-name').value = '';
+  openModal('modal-days');
+}
+
+function refreshDaysList() {
+  const list = document.getElementById('days-list');
+  if (!days.length) {
+    list.innerHTML = '<li class="empty-list">Nessuna giornata definita. Aggiungi sopra.</li>';
+    return;
+  }
+  list.innerHTML = '';
+  days.sort((a, b) => a.number - b.number);
+  days.forEach((d, i) => {
+    const wpInDay = waypoints.filter(w => w.day === d.number).length;
+    const li = document.createElement('li');
+    const dateStr = d.date ? new Date(d.date).toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' }) : 'Senza data';
+    li.innerHTML = `
+      <div class="item-info">
+        <strong>Giorno ${d.number}${d.name ? ' — ' + escapeHtml(d.name) : ''}</strong>
+        <small>${dateStr} · ${wpInDay} waypoint</small>
+      </div>
+      <div class="item-actions">
+        <button class="rename" onclick="editDay(${d.number})">✎</button>
+        <button class="del" onclick="deleteDay(${d.number})">×</button>
+      </div>
+    `;
+    list.appendChild(li);
+  });
+}
+
+function addDay() {
+  const date = document.getElementById('new-day-date').value || null;
+  const name = document.getElementById('new-day-name').value.trim();
+  const nextNumber = days.length ? Math.max(...days.map(d => d.number)) + 1 : 1;
+  days.push({ number: nextNumber, date, name, notes: '' });
+  document.getElementById('new-day-date').value = '';
+  document.getElementById('new-day-name').value = '';
+  refreshDaysList();
+  updateAll();
+  markDirty();
+}
+
+function editDay(number) {
+  const d = days.find(x => x.number === number);
+  if (!d) return;
+  const newName = prompt('Nome giornata:', d.name);
+  if (newName === null) return;
+  const newDate = prompt('Data (YYYY-MM-DD, vuoto per nessuna):', d.date || '');
+  if (newDate === null) return;
+  const newNotes = prompt('Note:', d.notes || '');
+  if (newNotes === null) return;
+  d.name = newName.trim();
+  d.date = newDate.trim() || null;
+  d.notes = newNotes.trim();
+  refreshDaysList();
+  updateAll();
+  markDirty();
+}
+
+function deleteDay(number) {
+  if (!confirm(`Eliminare il giorno ${number}? I waypoint assegnati rimangono ma diventano "non assegnati".`)) return;
+  days = days.filter(d => d.number !== number);
+  waypoints.forEach(w => { if (w.day === number) w.day = null; });
+  refreshDaysList();
+  updateAll();
+  markDirty();
+}
+
+function getDayInfo(number) {
+  return days.find(d => d.number === number) || null;
+}
+
+// ===========================================
+// DEPTH API + CACHE
+// ===========================================
+function cacheKey(lat, lng) { return `${lat.toFixed(4)},${lng.toFixed(4)}`; }
+async function fetchDepth(lat, lng) {
+  const key = cacheKey(lat, lng);
+  if (depthCache.has(key)) return depthCache.get(key);
+  try {
+    const point = `POINT(${lng} ${lat})`;
+    const url = `${EMODNET_REST}?geom=${encodeURIComponent(point)}`;
+    const r = await fetch(url);
+    if (!r.ok) { depthCache.set(key, null); return null; }
+    const d = await r.json();
+    let val = d.smoothed;
+    if (val === undefined || val === null) val = d.avg;
+    if (val === undefined || val === null) { depthCache.set(key, null); return null; }
+    const depth = Math.abs(val);
+    depthCache.set(key, depth);
+    return depth;
+  } catch (e) { depthCache.set(key, null); return null; }
+}
+function sampleSegment(a, b) {
+  const distNm = distanceNm(a, b);
+  const n = Math.max(2, Math.min(40, Math.ceil(distNm * getSamplesDensity())));
+  const out = [];
+  for (let i = 1; i < n; i++) {
+    const t = i / n;
+    out.push(L.latLng(a.lat + (b.lat - a.lat)*t, a.lng + (b.lng - a.lng)*t));
+  }
+  return out;
+}
+
+// ===========================================
+// LOG + PROGRESS
+// ===========================================
+function logLine(msg, level='') {
+  const log = document.getElementById('log');
+  log.style.display = 'block';
+  const div = document.createElement('div');
+  div.className = level;
+  div.textContent = msg;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+function clearLog() {
+  document.getElementById('log').innerHTML = '';
+  document.getElementById('log').style.display = 'none';
+}
+function setProgress(pct) {
+  const p = document.getElementById('progress');
+  const bar = document.getElementById('progress-bar');
+  p.classList.add('active');
+  bar.style.width = pct + '%';
+  if (pct >= 100) setTimeout(() => p.classList.remove('active'), 400);
+}
+
+// ===========================================
+// MARKER
+// ===========================================
+function makeIcon(num, type, isAuto, day) {
+  const cls = `marker-icon t-${type}${isAuto ? ' is-auto' : ''}`;
+  const dayBadge = day ? `<div class="marker-day-badge">${day}</div>` : '';
+  return L.divIcon({
+    className: '',
+    html: `<div class="marker-icon-wrapper"><div class="${cls}"><span class="num">${num}</span></div>${dayBadge}</div>`,
+    iconSize: [28, 28], iconAnchor: [14, 14]
+  });
+}
+
+function setupMarker(wp) {
+  wp.marker.on('drag', (e) => {
+    wp.latlng = e.target.getLatLng();
+    rebuildSegments();
+  });
+  wp.marker.on('dragend', () => {
+    updateStats();
+    invalidateValidation();
+    updateDepthFor(wp);
+    markDirty();
+  });
+  wp.marker.on('click', () => openEditPopup(wp));
+}
+
+function refreshMarkerLabels() {
+  waypoints.forEach((w, i) => {
+    w.marker.setIcon(makeIcon(i+1, w.type, w.auto, w.day));
+    const dayLabel = w.day ? ` G${w.day}` : '';
+    const tooltip = `WP${i+1}${dayLabel}${w.name ? ' ' + w.name : ''} (${TYPE_INFO[w.type].label}${w.auto ? ', auto' : ''})`;
+    w.marker.bindTooltip(tooltip);
+  });
+}
+
+async function updateDepthFor(wp) {
+  wp.depth = undefined;
+  updateList();
+  const d = await fetchDepth(wp.latlng.lat, wp.latlng.lng);
+  if (waypoints.includes(wp)) {
+    wp.depth = d;
+    updateList();
+  }
+}
+
+// ===========================================
+// WAYPOINT
+// ===========================================
+function insertWaypointAt(latlng, idx, opts={}, skipMark=false) {
+  const auto = !!opts.auto;
+  const type = opts.type || 'passaggio';
+  const day = opts.day !== undefined ? opts.day : inferDayForInsertion(idx);
+  const marker = L.marker(latlng, { draggable: true, icon: makeIcon(idx+1, type, auto, day) }).addTo(map);
+  const wp = {
+    marker,
+    latlng: L.latLng(latlng.lat, latlng.lng),
+    depth: opts.prefillDepth !== undefined ? opts.prefillDepth : undefined,
+    auto, type,
+    name: opts.name || '',
+    notes: opts.notes || '',
+    day
+  };
+  setupMarker(wp);
+  waypoints.splice(idx, 0, wp);
+  refreshMarkerLabels();
+  rebuildSegments();
+  updateStats();
+  updateList();
+  invalidateValidation();
+  if (!opts.skipDepthFetch) updateDepthFor(wp);
+  if (!skipMark) markDirty();
+}
+
+// Eredita la giornata dal waypoint precedente o successivo per inserimenti intermedi
+function inferDayForInsertion(idx) {
+  if (idx > 0 && waypoints[idx-1]) return waypoints[idx-1].day;
+  if (idx < waypoints.length && waypoints[idx]) return waypoints[idx].day;
+  return null;
+}
+
+function addWaypoint(latlng) { insertWaypointAt(latlng, waypoints.length); }
+function removeWaypoint(idx) {
+  map.removeLayer(waypoints[idx].marker);
+  waypoints.splice(idx, 1);
+  refreshMarkerLabels();
+  rebuildSegments();
+  updateStats();
+  updateList();
+  invalidateValidation();
+  markDirty();
+}
+function undoLast() { if (waypoints.length) removeWaypoint(waypoints.length - 1); }
+function clearAll() {
+  if (!waypoints.length) return;
+  if (!confirm('Eliminare tutti i waypoint?')) return;
+  waypoints.forEach(w => map.removeLayer(w.marker));
+  waypoints = [];
+  rebuildSegments();
+  updateStats();
+  updateList();
+  invalidateValidation();
+  markDirty();
+}
+
+// ===========================================
+// EDIT POPUP
+// ===========================================
+function openEditPopup(wp) {
+  const idx = waypoints.indexOf(wp);
+  if (idx < 0) return;
+  const dayOptions = [
+    `<option value="">— Nessuna —</option>`,
+    ...days.map(d => `<option value="${d.number}" ${wp.day === d.number ? 'selected' : ''}>G${d.number}${d.name ? ' — ' + escapeHtml(d.name) : ''}</option>`),
+    `<option value="__new__">+ Nuova giornata...</option>`
+  ].join('');
+  const html = `
+    <div class="edit-form" id="edit-form-${idx}">
+      <label>Nome
+        <input type="text" id="ef-name" value="${escapeHtml(wp.name)}" placeholder="es. Marina Trogir">
+      </label>
+      <label>Tipo
+        <select id="ef-type">
+          ${TYPE_KEYS.map(k => `<option value="${k}" ${wp.type === k ? 'selected' : ''}>${TYPE_INFO[k].label}</option>`).join('')}
+        </select>
+      </label>
+      <label>Giornata
+        <select id="ef-day" onchange="if(this.value==='__new__'){this.value='';quickAddDay(${idx});}">
+          ${dayOptions}
+        </select>
+      </label>
+      <label>Note
+        <textarea id="ef-notes" placeholder="ormeggio, contatti...">${escapeHtml(wp.notes)}</textarea>
+      </label>
+      <div class="btn-row">
+        <button class="delete" onclick="deleteFromEdit(${idx})" title="Elimina waypoint">🗑</button>
+        <button class="cancel" onclick="closeEditPopup()">Chiudi</button>
+        <button class="save" onclick="saveEdit(${idx})">💾 Salva</button>
+      </div>
+    </div>
+  `;
+  wp.marker.unbindPopup();
+  wp.marker.bindPopup(html, { minWidth: 260, autoClose: false, closeOnClick: false });
+  wp.marker.openPopup();
+}
+
+function quickAddDay(idxToReturnTo) {
+  const name = prompt('Nome della nuova giornata (es. "Trogir → Vis"):', '');
+  if (name === null) return;
+  const date = prompt('Data (YYYY-MM-DD, vuoto per nessuna):', '');
+  if (date === null) return;
+  const nextNumber = days.length ? Math.max(...days.map(d => d.number)) + 1 : 1;
+  days.push({ number: nextNumber, date: date.trim() || null, name: name.trim(), notes: '' });
+  markDirty();
+  // Ri-apre il popup con la giornata appena creata pre-selezionata
+  closeEditPopup();
+  if (waypoints[idxToReturnTo]) {
+    waypoints[idxToReturnTo].day = nextNumber;
+    refreshMarkerLabels();
+    updateList();
+    setTimeout(() => openEditPopup(waypoints[idxToReturnTo]), 100);
+  }
+}
+
+function closeEditPopup() { map.closePopup(); }
+
+function deleteFromEdit(idx) {
+  const wp = waypoints[idx];
+  if (!wp) return;
+  const label = wp.name ? `"${wp.name}"` : `WP${idx+1}`;
+  if (!confirm(`Eliminare il waypoint ${label}?`)) return;
+  closeEditPopup();
+  removeWaypoint(idx);
+}
+
+function saveEdit(idx) {
+  const wp = waypoints[idx];
+  if (!wp) return;
+  const form = document.getElementById(`edit-form-${idx}`);
+  if (!form) return;
+  wp.name = form.querySelector('#ef-name').value.trim();
+  wp.type = form.querySelector('#ef-type').value;
+  wp.notes = form.querySelector('#ef-notes').value.trim();
+  const dayVal = form.querySelector('#ef-day').value;
+  wp.day = dayVal === '' || dayVal === '__new__' ? null : parseInt(dayVal, 10);
+  wp.marker.setIcon(makeIcon(idx+1, wp.type, wp.auto, wp.day));
+  refreshMarkerLabels();
+  updateList();
+  closeEditPopup();
+  markDirty();
+}
+
+// ===========================================
+// SEGMENTI
+// ===========================================
+function segmentStyle(status) {
+  switch (status) {
+    case 'safe':     return { color: '#10b981', weight: 4, opacity: 0.85, dashArray: null };
+    case 'shallow':  return { color: '#ef4444', weight: 5, opacity: 0.9,  dashArray: null };
+    case 'checking': return { color: '#3b82f6', weight: 4, opacity: 0.6,  dashArray: '6,6' };
+    default:         return { color: '#2563eb', weight: 4, opacity: 0.85, dashArray: null };
+  }
+}
+function rebuildSegments() {
+  segments.forEach(s => map.removeLayer(s.polyline));
+  segments = [];
+  for (let i = 0; i < waypoints.length - 1; i++) {
+    segments.push(createSegment(i));
+  }
+}
+function createSegment(idx) {
+  const a = waypoints[idx].latlng, b = waypoints[idx+1].latlng;
+  const polyline = L.polyline([a, b], { ...segmentStyle('pending'), bubblingMouseEvents: false }).addTo(map);
+  const seg = { polyline, status: 'pending', minDepth: null };
+  polyline.on('click', (e) => insertWaypointAt(e.latlng, idx + 1));
+  return seg;
+}
+function setSegmentStatus(idx, status, minDepth=null) {
+  if (!segments[idx]) return;
+  segments[idx].status = status;
+  segments[idx].minDepth = minDepth;
+  segments[idx].polyline.setStyle(segmentStyle(status));
+  if (minDepth !== null) {
+    segments[idx].polyline.bindTooltip(`Segmento ${idx+1}: prof. min. ${fmt(minDepth, 1)} m`, { sticky: true });
+  }
+}
+function invalidateValidation() {
+  segments.forEach((s, i) => setSegmentStatus(i, 'pending'));
+  document.getElementById('btn-correct').disabled = true;
+  document.getElementById('route-status').textContent = 'non verificata';
+  document.getElementById('route-status').className = '';
+}
+
+// ===========================================
+// VALIDAZIONE + AUTO-CORREZIONE
+// ===========================================
+async function validateRoute() {
+  if (waypoints.length < 2) { alert('Servono almeno 2 waypoint'); return; }
+  const minDepth = getMinDepth();
+  document.getElementById('btn-validate').disabled = true;
+  clearLog();
+  logLine(`Verifica con prof. min. ${minDepth} m`);
+  let shallowCount = 0, totalSamples = 0, plannedSamples = 0;
+  for (let i = 0; i < segments.length; i++) {
+    plannedSamples += sampleSegment(waypoints[i].latlng, waypoints[i+1].latlng).length;
+  }
+  for (let i = 0; i < segments.length; i++) {
+    setSegmentStatus(i, 'checking');
+    const a = waypoints[i].latlng, b = waypoints[i+1].latlng;
+    const samples = sampleSegment(a, b);
+    const depths = [];
+    for (const s of samples) {
+      depths.push(await fetchDepth(s.lat, s.lng));
+      totalSamples++;
+      setProgress(Math.round(100 * totalSamples / plannedSamples));
+    }
+    const valid = depths.filter(d => d !== null);
+    const minD = valid.length ? Math.min(...valid) : null;
+    const isShallow = depths.some(d => d !== null && d < minDepth);
+    if (isShallow) {
+      shallowCount++;
+      logLine(`✗ Segm. ${i+1}: min ${fmt(minD, 1)} m`, 'warn');
+      setSegmentStatus(i, 'shallow', minD);
+    } else {
+      logLine(`✓ Segm. ${i+1}: min ${fmt(minD, 1)} m`, 'ok');
+      setSegmentStatus(i, 'safe', minD);
+    }
+  }
+  const status = document.getElementById('route-status');
+  if (shallowCount === 0) {
+    status.textContent = '✓ Sicura'; status.className = 'ok';
+  } else {
+    status.textContent = `⚠ ${shallowCount} segm. bassi`; status.className = 'warn';
+    document.getElementById('btn-correct').disabled = false;
+  }
+  document.getElementById('btn-validate').disabled = false;
+  setProgress(100);
+}
+
+async function isSegmentClear(a, b, minDepth) {
+  for (const s of sampleSegment(a, b)) {
+    const d = await fetchDepth(s.lat, s.lng);
+    if (d === null || d < minDepth) return false;
+  }
+  return true;
+}
+async function findDetour(a, b, minDepth) {
+  const segDistNm = distanceNm(a, b);
+  const mid = midpoint(a, b);
+  const θ_AB = bearing(a, b);
+  for (const offsetNm of DETOUR_OFFSETS_NM) {
+    if (offsetNm > segDistNm * 1.5) break;
+    for (const side of [+1, -1]) {
+      const candidate = destination(mid, θ_AB + 90 * side, offsetNm * 1.852);
+      const cd = await fetchDepth(candidate.lat, candidate.lng);
+      if (cd === null || cd < minDepth) continue;
+      if (!(await isSegmentClear(a, candidate, minDepth))) continue;
+      if (!(await isSegmentClear(candidate, b, minDepth))) continue;
+      return { latlng: candidate, offsetNm, side };
+    }
+  }
+  return null;
+}
+async function autoCorrect() {
+  const minDepth = getMinDepth();
+  document.getElementById('btn-correct').disabled = true;
+  document.getElementById('btn-validate').disabled = true;
+  clearLog();
+  logLine(`Auto-correzione (min ${minDepth} m)...`);
+  let corrected = 0, failed = 0, processed = 0;
+  const totalShallow = segments.filter(s => s.status === 'shallow').length;
+  let idx = 0;
+  while (idx < segments.length) {
+    if (segments[idx].status === 'shallow') {
+      processed++;
+      const a = waypoints[idx].latlng, b = waypoints[idx+1].latlng;
+      logLine(`Cerco deviazione segm. ${idx+1}...`);
+      setProgress(Math.round(100 * processed / Math.max(1, totalShallow)));
+      const detour = await findDetour(a, b, minDepth);
+      if (detour) {
+        // Eredita giornata dal waypoint di partenza
+        insertWaypointAt(detour.latlng, idx + 1, {
+          auto: true, type: 'passaggio',
+          name: `Deviaz. ${idx+1}`,
+          day: waypoints[idx].day
+        });
+        logLine(`  ✓ ${fmt(detour.offsetNm, 1)} nm ${detour.side > 0 ? 'dx' : 'sx'}`, 'ok');
+        corrected++;
+        idx += 2;
+      } else {
+        logLine(`  ✗ Vai a mano.`, 'err');
+        failed++; idx++;
+      }
+    } else { idx++; }
+  }
+  setProgress(100);
+  if (corrected) logLine(`Inseriti ${corrected} WP. Riverifica.`, 'ok');
+  if (failed) logLine(`${failed} segm. senza soluzione`, 'warn');
+  document.getElementById('btn-validate').disabled = false;
+  invalidateValidation();
+}
+
+// ===========================================
+// STATS + LISTA RAGGRUPPATA PER GIORNATA
+// ===========================================
+function updateAll() {
+  refreshMarkerLabels();
+  updateStats();
+  updateList();
+}
+
+function updateStats() {
+  document.getElementById('wp-count').textContent = waypoints.length;
+  document.getElementById('day-count').textContent = days.length;
+  let totalKm = 0;
+  for (let i = 1; i < waypoints.length; i++) {
+    totalKm += distanceKm(waypoints[i-1].latlng, waypoints[i].latlng);
+  }
+  const totalNm = totalKm / 1.852;
+  document.getElementById('total-nm').textContent = `${fmt(totalNm)} nm · ${formatTime(timeFromNm(totalNm))}`;
+}
+
+function depthBadge(wp) {
+  if (wp.depth === undefined) return `<span class="depth loading">… m</span>`;
+  if (wp.depth === null) return `<span class="depth na">— m</span>`;
+  let cls = '';
+  if (wp.depth < getMinDepth()) cls = 'shallow';
+  else if (wp.depth > 100) cls = 'deep';
+  return `<span class="depth ${cls}">${fmt(wp.depth, 1)} m</span>`;
+}
+
+// Distanza dei segmenti che appartengono a una specifica giornata.
+// Convenzione: il segmento (i, i+1) appartiene alla giornata del WP di ARRIVO.
+// In questo modo le navigazioni di transizione (es. ultimo WP del giorno N-1 al
+// primo WP del giorno N) sono attribuite correttamente alla giornata N.
+// Se il WP di arrivo non ha giornata, ricade sulla giornata del WP di partenza.
+function dayDistance(dayNum) {
+  let totalKm = 0;
+  for (let i = 0; i < waypoints.length - 1; i++) {
+    const target = (waypoints[i+1].day !== null && waypoints[i+1].day !== undefined)
+      ? waypoints[i+1].day
+      : waypoints[i].day;
+    if (target === dayNum) {
+      totalKm += distanceKm(waypoints[i].latlng, waypoints[i+1].latlng);
+    }
+  }
+  return totalKm;
+}
+
+function renderWaypointLi(w, i) {
+  let segInfo = '';
+  if (i > 0) {
+    const segKm = distanceKm(waypoints[i-1].latlng, w.latlng);
+    const segNm = segKm / 1.852;
+    segInfo = `<span class="seg">+ ${fmt(segNm)} nm · ${formatTime(timeFromNm(segNm))}</span>`;
+  }
+
+  // Per waypoint di tipo destinazione (non passaggio): se ci sono passaggi
+  // intermedi tra qui e l'ultima destinazione, mostra distanza e tempo cumulati
+  let fromDestInfo = '';
+  if (w.type !== 'passaggio' && i > 0) {
+    let lastDestIdx = -1;
+    for (let j = i - 1; j >= 0; j--) {
+      if (waypoints[j].type !== 'passaggio') { lastDestIdx = j; break; }
+    }
+    if (lastDestIdx >= 0 && lastDestIdx < i - 1) {
+      let cumKm = 0;
+      for (let k = lastDestIdx; k < i; k++) {
+        cumKm += distanceKm(waypoints[k].latlng, waypoints[k+1].latlng);
+      }
+      const cumNm = cumKm / 1.852;
+      const lastDestName = waypoints[lastDestIdx].name || `WP${lastDestIdx+1}`;
+      fromDestInfo = `<span class="from-dest">↪ Da ${escapeHtml(lastDestName)}: ${fmt(cumNm)} nm · ${formatTime(timeFromNm(cumNm))}</span>`;
+    }
+  }
+
+  const li = document.createElement('li');
+  li.className = `t-${w.type}${w.auto ? ' is-auto' : ''}`;
+  const autoTag = w.auto ? `<span class="auto-tag">AUTO</span>` : '';
+  const nameDisplay = w.name ? `<span class="name">${escapeHtml(w.name)}</span>` : '';
+  li.innerHTML = `
+    <div class="info">
+      <div class="header">
+        <strong>WP${i+1}</strong>
+        <span class="type-badge">${TYPE_INFO[w.type].label}</span>
+        ${autoTag}
+        ${segInfo}
+      </div>
+      ${nameDisplay}
+      <small>${w.latlng.lat.toFixed(4)}°, ${w.latlng.lng.toFixed(4)}°</small>
+      ${fromDestInfo}
+      ${depthBadge(w)}
+    </div>
+    <div class="actions-mini">
+      <button class="edit" onclick="openEditPopup(waypoints[${i}])" title="Modifica">✎</button>
+      <button class="del" onclick="removeWaypoint(${i})" title="Rimuovi">×</button>
+    </div>
+  `;
+  return li;
+}
+
+function updateList() {
+  const container = document.getElementById('day-groups');
+  if (waypoints.length === 0) {
+    container.innerHTML = '<div class="empty">Click sulla mappa per iniziare</div>';
+    return;
+  }
+  container.innerHTML = '';
+
+  // Ordina giornate per numero
+  const sortedDays = [...days].sort((a, b) => a.number - b.number);
+
+  // Crea un gruppo per ogni giornata definita (anche se vuota)
+  sortedDays.forEach(d => {
+    const wpIndices = waypoints.map((w, i) => w.day === d.number ? i : -1).filter(i => i >= 0);
+    const group = createDayGroup(d, wpIndices);
+    container.appendChild(group);
+  });
+
+  // Gruppo "non assegnati" per i waypoint senza day
+  const unassignedIndices = waypoints.map((w, i) => w.day === null || w.day === undefined ? i : -1).filter(i => i >= 0);
+  if (unassignedIndices.length) {
+    const group = createDayGroup(null, unassignedIndices);
+    container.appendChild(group);
+  }
+}
+
+function createDayGroup(dayInfo, wpIndices) {
+  const group = document.createElement('div');
+  group.className = 'day-group';
+  const isUnassigned = dayInfo === null;
+  const collapseKey = isUnassigned ? '__unassigned__' : `day_${dayInfo.number}`;
+  if (collapsedDays.has(collapseKey)) group.classList.add('collapsed');
+
+  // Header
+  const header = document.createElement('div');
+  header.className = 'day-header' + (isUnassigned ? ' unassigned' : '');
+  const distKm = isUnassigned ? null : dayDistance(dayInfo.number);
+  const distNm = distKm !== null ? distKm / 1.852 : null;
+  const dateStr = !isUnassigned && dayInfo.date
+    ? new Date(dayInfo.date).toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' })
+    : '';
+  let title;
+  if (isUnassigned) {
+    title = `Non assegnati (${wpIndices.length})`;
+  } else {
+    title = `G${dayInfo.number}${dayInfo.name ? ' — ' + escapeHtml(dayInfo.name) : ''}`;
+    if (dateStr) title += ` · ${dateStr}`;
+  }
+  const stats = isUnassigned
+    ? ''
+    : `${wpIndices.length} WP · ${fmt(distNm)} nm · ${formatTime(timeFromNm(distNm))}`;
+  header.innerHTML = `
+    <span class="toggle">▼</span>
+    <span class="day-title">${title}</span>
+    <span class="day-stats">${stats}</span>
+  `;
+  header.onclick = () => {
+    if (collapsedDays.has(collapseKey)) collapsedDays.delete(collapseKey);
+    else collapsedDays.add(collapseKey);
+    group.classList.toggle('collapsed');
+  };
+  group.appendChild(header);
+
+  // Lista waypoint
+  const list = document.createElement('ol');
+  list.className = 'waypoints';
+  if (!wpIndices.length) {
+    const empty = document.createElement('li');
+    empty.className = 'empty';
+    empty.style.borderLeft = 'none';
+    empty.style.background = 'transparent';
+    empty.textContent = 'Nessun waypoint';
+    list.appendChild(empty);
+  } else {
+    wpIndices.forEach(i => list.appendChild(renderWaypointLi(waypoints[i], i)));
+  }
+  group.appendChild(list);
+
+  return group;
+}
+
+// ===========================================
+// DATI STRUTTURATI
+// ===========================================
+function getRouteData() {
+  const cruiseSpeed = getCruiseSpeed();
+  let totalKm = 0;
+  const wpData = waypoints.map((w, i) => ({
+    index: i + 1,
+    name: w.name || `WP${i+1}`,
+    type: w.type,
+    type_label: TYPE_INFO[w.type].label,
+    lat: parseFloat(w.latlng.lat.toFixed(6)),
+    lng: parseFloat(w.latlng.lng.toFixed(6)),
+    depth_m: w.depth === undefined || w.depth === null ? null : Math.round(w.depth * 10) / 10,
+    auto: w.auto,
+    notes: w.notes || '',
+    day: w.day
+  }));
+  const segData = [];
+  for (let i = 0; i < waypoints.length - 1; i++) {
+    const a = waypoints[i].latlng, b = waypoints[i+1].latlng;
+    const km = distanceKm(a, b);
+    totalKm += km;
+    const seg = segments[i];
+    const nm = km / 1.852;
+    segData.push({
+      index: i + 1,
+      from_index: i + 1, to_index: i + 2,
+      from_name: waypoints[i].name || `WP${i+1}`,
+      to_name: waypoints[i+1].name || `WP${i+2}`,
+      from_day: waypoints[i].day,
+      to_day: waypoints[i+1].day,
+      distance_nm: parseFloat(nm.toFixed(2)),
+      distance_km: parseFloat(km.toFixed(2)),
+      time_h: parseFloat((nm / cruiseSpeed).toFixed(3)),
+      time_label: formatTime(nm / cruiseSpeed),
+      bearing_deg: parseFloat(bearing(a, b).toFixed(0)),
+      validation_status: seg ? seg.status : 'pending',
+      min_depth_m: seg && seg.minDepth !== null ? Math.round(seg.minDepth * 10) / 10 : null
+    });
+  }
+  // Per i waypoint destinazione (non-passaggio): distanza/tempo cumulati
+  // dall'ultima destinazione precedente (utile quando ci sono passaggi intermedi)
+  let lastDestIdx = -1;
+  wpData.forEach((w, i) => {
+    if (w.type !== 'passaggio') {
+      if (lastDestIdx >= 0 && lastDestIdx < i - 1) {
+        let cumKm = 0;
+        for (let k = lastDestIdx; k < i; k++) {
+          cumKm += distanceKm(waypoints[k].latlng, waypoints[k+1].latlng);
+        }
+        const cumNm = cumKm / 1.852;
+        w.from_last_dest = {
+          from_index: lastDestIdx + 1,
+          from_name: wpData[lastDestIdx].name,
+          distance_nm: parseFloat(cumNm.toFixed(2)),
+          time_h: parseFloat((cumNm / cruiseSpeed).toFixed(3)),
+          time_label: formatTime(cumNm / cruiseSpeed)
+        };
+      }
+      lastDestIdx = i;
+    }
+  });
+
+  const daysData = [...days].sort((a, b) => a.number - b.number).map(d => {
+    const dayWPs = waypoints.filter(w => w.day === d.number);
+    const distKm = dayDistance(d.number);
+    const distNm = distKm / 1.852;
+    return {
+      number: d.number,
+      date: d.date,
+      name: d.name,
+      notes: d.notes,
+      waypoint_count: dayWPs.length,
+      distance_nm: parseFloat(distNm.toFixed(2)),
+      distance_km: parseFloat(distKm.toFixed(2)),
+      time_h: parseFloat((distNm / cruiseSpeed).toFixed(3)),
+      time_label: formatTime(distNm / cruiseSpeed)
+    };
+  });
+  const totalNm = totalKm / 1.852;
+  return {
+    metadata: {
+      route_name: currentRouteName,
+      generated: new Date().toISOString(),
+      generator: 'Pianificatore Rotta Vela v5',
+      waypoint_count: waypoints.length,
+      segment_count: segData.length,
+      day_count: daysData.length,
+      total_distance_nm: parseFloat(totalNm.toFixed(2)),
+      total_distance_km: parseFloat(totalKm.toFixed(2)),
+      total_time_h: parseFloat((totalNm / cruiseSpeed).toFixed(3)),
+      total_time_label: formatTime(totalNm / cruiseSpeed),
+      cruise_speed_kn: cruiseSpeed,
+      min_depth_threshold_m: getMinDepth()
+    },
+    days: daysData,
+    waypoints: wpData,
+    segments: segData
+  };
+}
+
+// ===========================================
+// EXPORT MENU
+// ===========================================
+function handleExport(type) {
+  if (!type) return;
+  document.getElementById('export-menu').value = '';
+  if (waypoints.length === 0) { alert('Nessun waypoint da esportare'); return; }
+  switch (type) {
+    case 'gpx': exportGPX(); break;
+    case 'json': exportJSON(); break;
+    case 'csv': exportCSV(); break;
+    case 'md': exportMarkdown(); break;
+    case 'pdf': exportPDF(); break;
+  }
+}
+
+// ===========================================
+// EXPORT: GPX
+// ===========================================
+function symFromType(type, auto) {
+  if (auto) return 'Waypoint';
+  switch (type) {
+    case 'porto': return 'Anchor';
+    case 'rada': return 'Anchor Prohibited';
+    case 'poi': return 'Waypoint';
+    default: return 'Pin';
+  }
+}
+function exportGPX() {
+  const now = new Date().toISOString();
+  let gpx = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Pianificatore Rotta Vela v5" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata><time>${now}</time><name>${escapeHtml(currentRouteName || 'Rotta vela')}</name></metadata>
+`;
+  waypoints.forEach((w, i) => {
+    const name = (w.name ? w.name : `WP${i+1}`) + (w.auto ? ' (auto)' : '');
+    const sym = symFromType(w.type, w.auto);
+    let descParts = [];
+    if (w.day) {
+      const di = getDayInfo(w.day);
+      descParts.push(`Giorno ${w.day}${di && di.name ? ' (' + di.name + ')' : ''}`);
+    }
+    if (w.notes) descParts.push(w.notes);
+    const desc = descParts.join(' — ');
+    gpx += `  <wpt lat="${w.latlng.lat}" lon="${w.latlng.lng}">
+    <name>${escapeHtml(name)}</name>
+    <sym>${sym}</sym>
+    <type>${w.type}</type>${desc ? `\n    <desc>${escapeHtml(desc)}</desc>` : ''}
+  </wpt>
+`;
+  });
+  gpx += `  <rte><name>${escapeHtml(currentRouteName || 'Rotta')}</name>\n`;
+  waypoints.forEach((w, i) => {
+    gpx += `    <rtept lat="${w.latlng.lat}" lon="${w.latlng.lng}"><name>WP${i+1}</name></rtept>\n`;
+  });
+  gpx += `  </rte>\n</gpx>`;
+  downloadFile(gpx, `${(currentRouteName || 'rotta').replace(/[^a-z0-9_-]/gi, '_')}_${dateStr()}.gpx`, 'application/gpx+xml');
+}
+
+// ===========================================
+// EXPORT: JSON
+// ===========================================
+function exportJSON() {
+  const data = getRouteData();
+  downloadFile(JSON.stringify(data, null, 2), `${(currentRouteName || 'rotta').replace(/[^a-z0-9_-]/gi, '_')}_${dateStr()}.json`, 'application/json');
+}
+
+// ===========================================
+// EXPORT: CSV
+// ===========================================
+function csvEscape(v) {
+  if (v === null || v === undefined) return '';
+  const s = String(v);
+  if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+function exportCSV() {
+  const data = getRouteData();
+  const rows = [];
+  rows.push(['#', 'Giorno', 'Data', 'Nome', 'Tipo', 'Lat', 'Lon', 'Profondità (m)', 'Distanza prec. (nm)', 'Tempo prec.', 'Rilevamento (°)', 'Auto', 'Note']);
+  data.waypoints.forEach((w, i) => {
+    const seg = i > 0 ? data.segments[i-1] : null;
+    const di = w.day ? getDayInfo(w.day) : null;
+    rows.push([
+      w.index,
+      w.day || '',
+      di && di.date ? di.date : '',
+      w.name,
+      w.type_label,
+      w.lat.toFixed(6),
+      w.lng.toFixed(6),
+      w.depth_m !== null ? w.depth_m : '',
+      seg ? seg.distance_nm : '',
+      seg ? seg.time_label : '',
+      seg ? seg.bearing_deg : '',
+      w.auto ? 'sì' : 'no',
+      w.notes
+    ]);
+  });
+  rows.push([]);
+  rows.push(['TOTALE', '', '', '', '', '', '', '', data.metadata.total_distance_nm + ' nm', data.metadata.total_time_label, '', '', '']);
+  rows.push(['Velocità di crociera:', data.metadata.cruise_speed_kn + ' kn']);
+  if (data.days.length) {
+    rows.push([]);
+    rows.push(['Riepilogo per giorno']);
+    rows.push(['Giorno', 'Data', 'Nome', 'Waypoint', 'Distanza (nm)', 'Tempo']);
+    data.days.forEach(d => {
+      rows.push([d.number, d.date || '', d.name || '', d.waypoint_count, d.distance_nm, d.time_label]);
+    });
+  }
+  const csv = rows.map(r => r.map(csvEscape).join(',')).join('\n');
+  downloadFile('\ufeff' + csv, `${(currentRouteName || 'rotta').replace(/[^a-z0-9_-]/gi, '_')}_${dateStr()}.csv`, 'text/csv;charset=utf-8');
+}
+
+// ===========================================
+// EXPORT: MARKDOWN
+// ===========================================
+function exportMarkdown() {
+  const data = getRouteData();
+  let md = `# ${currentRouteName || 'Rotta Vela'}\n\n`;
+  md += `Generata: ${new Date().toLocaleString('it-IT')}\n\n`;
+  md += `## Riepilogo\n\n`;
+  md += `| | |\n|---|---|\n`;
+  md += `| Waypoints | ${data.metadata.waypoint_count} |\n`;
+  md += `| Giornate | ${data.metadata.day_count} |\n`;
+  md += `| Distanza totale | **${fmt(data.metadata.total_distance_nm)} nm** (${fmt(data.metadata.total_distance_km)} km) |\n`;
+  md += `| Tempo totale (a ${data.metadata.cruise_speed_kn} kn) | **${data.metadata.total_time_label}** |\n`;
+  md += `| Profondità minima | ${data.metadata.min_depth_threshold_m} m |\n\n`;
+
+  if (data.days.length) {
+    md += `## Giornate\n\n`;
+    md += `| Giorno | Data | Nome | WP | Distanza | Tempo |\n`;
+    md += `|--------|------|------|-----|----------|-------|\n`;
+    data.days.forEach(d => {
+      const dateStr = d.date ? new Date(d.date).toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' }) : '—';
+      md += `| ${d.number} | ${dateStr} | ${d.name || '—'} | ${d.waypoint_count} | ${fmt(d.distance_nm)} nm | ${d.time_label} |\n`;
+    });
+    md += `\n`;
+
+    data.days.forEach(d => {
+      md += `### Giorno ${d.number}${d.name ? ' — ' + d.name : ''}\n\n`;
+      const dateStr = d.date ? new Date(d.date).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }) : '';
+      if (dateStr) md += `*${dateStr}* · **${fmt(d.distance_nm)} nm · ${d.time_label}**\n\n`;
+      if (d.notes) md += `${d.notes}\n\n`;
+      const dayWPs = data.waypoints.filter(w => w.day === d.number);
+      if (dayWPs.length) {
+        md += `| # | Nome | Tipo | Lat | Lon | Prof. | Da prec. | Tempo | Note |\n`;
+        md += `|---|------|------|-----|-----|-------|----------|-------|------|\n`;
+        dayWPs.forEach(w => {
+          const seg = data.segments.find(s => s.to_index === w.index);
+          const distStr = seg ? `${fmt(seg.distance_nm)} nm` : '—';
+          const timeStr = seg ? seg.time_label : '—';
+          md += `| ${w.index} | ${w.name}${w.auto ? ' _(auto)_' : ''} | ${w.type_label} | ${w.lat.toFixed(4)} | ${w.lng.toFixed(4)} | ${w.depth_m !== null ? fmt(w.depth_m, 1) + ' m' : '—'} | ${distStr} | ${timeStr} | ${(w.notes || '').replace(/\|/g, '\\|')} |\n`;
+        });
+        md += `\n`;
+      } else {
+        md += `_Nessun waypoint assegnato._\n\n`;
+      }
+    });
+  }
+
+  const unassigned = data.waypoints.filter(w => !w.day);
+  if (unassigned.length) {
+    md += `### Waypoint non assegnati a giornate\n\n`;
+    md += `| # | Nome | Tipo | Lat | Lon | Prof. | Note |\n`;
+    md += `|---|------|------|-----|-----|-------|------|\n`;
+    unassigned.forEach(w => {
+      md += `| ${w.index} | ${w.name}${w.auto ? ' _(auto)_' : ''} | ${w.type_label} | ${w.lat.toFixed(4)} | ${w.lng.toFixed(4)} | ${w.depth_m !== null ? fmt(w.depth_m, 1) + ' m' : '—'} | ${(w.notes || '').replace(/\|/g, '\\|')} |\n`;
+    });
+    md += `\n`;
+  }
+
+  md += `## Segmenti\n\n`;
+  md += `| # | Da → A | Giorno | Distanza | Tempo | Rilev. | Stato | Prof. min |\n`;
+  md += `|---|--------|--------|----------|-------|--------|-------|-----------|\n`;
+  data.segments.forEach(s => {
+    const statusEmoji = { safe: '✅', shallow: '⚠️', pending: '⏳', checking: '🔄' }[s.validation_status] || s.validation_status;
+    const dayStr = s.from_day === s.to_day ? (s.from_day || '—') : `${s.from_day || '—'}→${s.to_day || '—'}`;
+    md += `| ${s.index} | ${s.from_name} → ${s.to_name} | ${dayStr} | ${fmt(s.distance_nm)} nm | ${s.time_label} | ${s.bearing_deg}° | ${statusEmoji} | ${s.min_depth_m !== null ? fmt(s.min_depth_m, 1) + ' m' : '—'} |\n`;
+  });
+
+  // Sezione "tra destinazioni" (escludendo passaggi)
+  const destinations = data.waypoints.filter(w => w.type !== 'passaggio');
+  if (destinations.some(w => w.from_last_dest)) {
+    md += `\n## Tra destinazioni (escluso passaggi intermedi)\n\n`;
+    md += `_Distanze e tempi cumulati tra waypoint di tipo Porto, Rada e POI, includendo eventuali passaggi intermedi della rotta._\n\n`;
+    md += `| Da | A | Distanza | Tempo |\n`;
+    md += `|----|---|----------|-------|\n`;
+    destinations.forEach(w => {
+      if (w.from_last_dest) {
+        md += `| ${w.from_last_dest.from_name} | ${w.name} | ${fmt(w.from_last_dest.distance_nm)} nm | ${w.from_last_dest.time_label} |\n`;
+      }
+    });
+  }
+
+  md += `\n---\n\n_Pianificatore Rotta Vela v5 — velocità ${data.metadata.cruise_speed_kn} kn — verifica sempre la rotta a vista_\n`;
+  downloadFile(md, `${(currentRouteName || 'rotta').replace(/[^a-z0-9_-]/gi, '_')}_${dateStr()}.md`, 'text/markdown;charset=utf-8');
+}
+
+// ===========================================
+// EXPORT: PDF
+// ===========================================
+function hexToRgb(hex) {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return m ? { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) } : { r: 0, g: 0, b: 0 };
+}
+
+// Cache del font Roboto (Latin Extended, copre š/ć/đ/ž croati e tutti i diacritici europei)
+// Lo carichiamo da jsDelivr (CDN affidabile con CORS aperto) una sola volta per sessione
+let _robotoFontCache = null;
+let _robotoFontTried = false;
+async function loadRobotoFont() {
+  if (_robotoFontCache) return _robotoFontCache;
+  if (_robotoFontTried) return null;
+  _robotoFontTried = true;
+  // URL TTF (non WOFF2) da fontsource via jsDelivr.
+  // Roboto Condensed Latin Extended TTF: copre tutti i caratteri europei estesi.
+  const TIMEOUT_MS = 6000;
+  const tryFetch = async (url) => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+    try {
+      const r = await fetch(url, { signal: ctrl.signal });
+      clearTimeout(t);
+      if (!r.ok) return null;
+      const buf = await r.arrayBuffer();
+      // Sanity check: TTF valido inizia con "OTTO" (CFF) o 0x00010000 (TrueType)
+      const view = new DataView(buf);
+      const sig = view.getUint32(0);
+      if (sig !== 0x00010000 && sig !== 0x4F54544F /* OTTO */ && sig !== 0x74727565 /* true */) {
+        return null;
+      }
+      // Min size sanity (un TTF Latin Ext è almeno ~50KB)
+      if (buf.byteLength < 30000) return null;
+      return buf;
+    } catch (e) {
+      clearTimeout(t);
+      return null;
+    }
+  };
+  try {
+    const regUrl = 'https://cdn.jsdelivr.net/npm/@fontsource/roboto@5.2.5/files/roboto-latin-ext-400-normal.ttf';
+    const boldUrl = 'https://cdn.jsdelivr.net/npm/@fontsource/roboto@5.2.5/files/roboto-latin-ext-700-normal.ttf';
+    const [reg, bold] = await Promise.all([tryFetch(regUrl), tryFetch(boldUrl)]);
+    if (!reg || !bold) return null;
+    const toBase64 = (buf) => {
+      const bytes = new Uint8Array(buf);
+      let binary = '';
+      const chunk = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunk) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+      }
+      return btoa(binary);
+    };
+    _robotoFontCache = { regular: toBase64(reg), bold: toBase64(bold) };
+    return _robotoFontCache;
+  } catch (e) {
+    console.warn('Caricamento font Roboto fallito:', e);
+    return null;
+  }
+}
+
+// Registra il font in jsPDF con verifica funzionale.
+// Restituisce 'Roboto' se il font è stato registrato e funziona, altrimenti 'helvetica'.
+async function setupPdfFont(doc) {
+  const f = await loadRobotoFont();
+  if (!f) return 'helvetica';
+  try {
+    doc.addFileToVFS('Roboto-Regular.ttf', f.regular);
+    doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
+    doc.addFileToVFS('Roboto-Bold.ttf', f.bold);
+    doc.addFont('Roboto-Bold.ttf', 'Roboto', 'bold');
+    // Verifica funzionale: se il font è davvero usabile, getTextWidth non lancia
+    doc.setFont('Roboto', 'normal');
+    doc.setFontSize(10);
+    const w = doc.getTextWidth('Test croato Šćedro');
+    if (!isFinite(w) || w <= 0) {
+      console.warn('Font Roboto registrato ma non funzionante, fallback a Helvetica');
+      doc.setFont('helvetica', 'normal');
+      return 'helvetica';
+    }
+    return 'Roboto';
+  } catch (e) {
+    console.warn('Setup font fallito, uso Helvetica:', e);
+    try { doc.setFont('helvetica', 'normal'); } catch(_) {}
+    return 'helvetica';
+  }
+}
+
+// Traslitterazione caratteri croati/slavi -> latini base.
+// Da usare SOLO quando font='helvetica' perché Helvetica non ha quei glifi.
+const CROAT_MAP = {
+  'š':'s','Š':'S','ć':'c','Ć':'C','č':'c','Č':'C',
+  'đ':'d','Đ':'D','ž':'z','Ž':'Z',
+  'ř':'r','Ř':'R','ě':'e','Ě':'E',
+  'ą':'a','Ą':'A','ę':'e','Ę':'E','ł':'l','Ł':'L',
+  'ń':'n','Ń':'N','ó':'o','Ó':'O','ś':'s','Ś':'S','ź':'z','Ź':'Z','ż':'z','Ż':'Z'
+};
+function safeText(s, fontName) {
+  if (!s) return '';
+  if (fontName === 'Roboto') return s;
+  // Helvetica: traslittera caratteri non supportati
+  return String(s).replace(/[^\u0000-\u00FF]/g, c => CROAT_MAP[c] || c);
+}
+
+// Disegna un titolo adattivo: prova fontSize decrescente finché entra in maxWidth.
+// Se non entra nemmeno al minimo, taglia con ellipsis.
+function drawAdaptiveTitle(doc, text, x, y, maxWidth, opts={}) {
+  const maxFont = opts.maxFont || 16;
+  const minFont = opts.minFont || 11;
+  const color = opts.color || [30, 58, 138];
+  doc.setTextColor(color[0], color[1], color[2]);
+  doc.setFont(opts.font || 'Roboto', opts.style || 'bold');
+  for (let f = maxFont; f >= minFont; f -= 0.5) {
+    doc.setFontSize(f);
+    if (doc.getTextWidth(text) <= maxWidth) {
+      doc.text(text, x, y);
+      return f;
+    }
+  }
+  // Tronca con ellipsis a fontSize minimo
+  doc.setFontSize(minFont);
+  let truncated = text;
+  while (truncated.length > 5 && doc.getTextWidth(truncated + '…') > maxWidth) {
+    truncated = truncated.slice(0, -1);
+  }
+  doc.text(truncated + '…', x, y);
+  return minFont;
+}
+
+// Scarica un'immagine satellite Esri World Imagery per un bbox.
+// IMPORTANTE: widthPx e heightPx devono essere proporzionali alla forma del bbox
+// (lng span * cosLat vs lat span) altrimenti l'immagine viene stirata.
+// Restituisce dataURL JPEG processato (opacizzato) o null se fallisce.
+// Timeout 8s per evitare di bloccare l'export PDF se la rete è lenta.
+async function fetchSatelliteImage(west, south, east, north, widthPx, heightPx, opacity=0.5) {
+  const TIMEOUT_MS = 8000;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const url = `https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/export?bbox=${west},${south},${east},${north}&bboxSR=4326&imageSR=4326&size=${Math.round(widthPx)},${Math.round(heightPx)}&format=jpg&transparent=false&f=image`;
+    const r = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (!r.ok) {
+      console.warn('Satellite HTTP error:', r.status);
+      return null;
+    }
+    const blob = await r.blob();
+    // Image load con timeout
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image();
+      const imgTimeout = setTimeout(() => {
+        reject(new Error('Image load timeout'));
+      }, 5000);
+      i.crossOrigin = 'anonymous';
+      i.onload = () => { clearTimeout(imgTimeout); resolve(i); };
+      i.onerror = (e) => { clearTimeout(imgTimeout); reject(new Error('Image load failed')); };
+      i.src = URL.createObjectURL(blob);
+    });
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth || Math.round(widthPx);
+    canvas.height = img.naturalHeight || Math.round(heightPx);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.globalAlpha = opacity;
+    ctx.drawImage(img, 0, 0);
+    ctx.globalAlpha = 1.0;
+    try {
+      return canvas.toDataURL('image/jpeg', 0.85);
+    } catch (taintErr) {
+      console.warn('Canvas tainted, satellite skipped:', taintErr);
+      return null;
+    }
+  } catch (e) {
+    clearTimeout(timeoutId);
+    if (e.name === 'AbortError') {
+      console.warn('Satellite timeout dopo', TIMEOUT_MS, 'ms');
+    } else {
+      console.warn('Satellite fetch fallito:', e.message);
+    }
+    return null;
+  }
+}
+
+// Calcola dimensioni pixel proporzionali per richiesta a Esri
+// (così l'immagine non viene distorta nel rendering PDF)
+function computeSatellitePxSize(west, south, east, north, targetMaxPx=1024) {
+  const meanLat = (south + north) / 2;
+  const cosLat = Math.cos(toRad(meanLat));
+  const lngSpan = (east - west) * cosLat;
+  const latSpan = north - south;
+  const ratio = lngSpan / latSpan;
+  let pxW, pxH;
+  if (ratio >= 1) {
+    pxW = targetMaxPx;
+    pxH = Math.max(200, Math.round(targetMaxPx / ratio));
+  } else {
+    pxH = targetMaxPx;
+    pxW = Math.max(200, Math.round(targetMaxPx * ratio));
+  }
+  return { pxW, pxH };
+}
+
+// Disegna lo schematico della rotta. Se filterDay è specificato, disegna solo quei waypoint.
+// Async perché può scaricare il satellite. opts.satelliteDataUrl è opzionale: se passato
+// viene usato come sfondo (per evitare doppio download); altrimenti tenta il download al volo.
+async function drawSchematic(doc, x, y, w, h, data, filterDay=null, opts={}) {
+  let pts = data.waypoints;
+  if (filterDay !== null) {
+    pts = data.waypoints.filter(p => p.day === filterDay);
+    if (!pts.length) return;
+  }
+  const lats = pts.map(p => p.lat);
+  const lngs = pts.map(p => p.lng);
+  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+  const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+  const padLat = Math.max((maxLat - minLat) * 0.18, 0.05);
+  const padLng = Math.max((maxLng - minLng) * 0.18, 0.05);
+  const south = minLat - padLat, north = maxLat + padLat;
+  const west = minLng - padLng, east = maxLng + padLng;
+  const meanLat = (south + north) / 2;
+  const cosLat = Math.cos(toRad(meanLat));
+  const lngSpan = (east - west) * cosLat;
+  const latSpan = north - south;
+  const scaleX = w / lngSpan, scaleY = h / latSpan;
+  const scale = Math.min(scaleX, scaleY);
+  const drawW = lngSpan * scale, drawH = latSpan * scale;
+  const offsetX = x + (w - drawW) / 2;
+  const offsetY = y + (h - drawH) / 2;
+
+  function project(lat, lng) {
+    return [
+      offsetX + (lng - west) * cosLat * scale,
+      offsetY + (north - lat) * scale
+    ];
+  }
+
+  // 1. Sfondo: prova satellite, fallback acqua
+  let satOk = false;
+  let satUrl = opts.satelliteDataUrl;
+  if (!satUrl) {
+    const { pxW, pxH } = computeSatellitePxSize(west, south, east, north, 900);
+    satUrl = await fetchSatelliteImage(west, south, east, north, pxW, pxH, 0.55);
+  }
+  if (satUrl) {
+    try {
+      doc.addImage(satUrl, 'JPEG', offsetX, offsetY, drawW, drawH);
+      satOk = true;
+    } catch (e) { satOk = false; }
+  }
+  if (!satOk) {
+    doc.setFillColor(220, 234, 250);
+    doc.rect(offsetX, offsetY, drawW, drawH, 'F');
+  }
+
+  // 2. Griglia
+  doc.setDrawColor(satOk ? 255 : 180, satOk ? 255 : 200, satOk ? 255 : 220);
+  doc.setLineWidth(0.1);
+  doc.setFontSize(6);
+  doc.setTextColor(satOk ? 80 : 120, satOk ? 80 : 130, satOk ? 80 : 140);
+  const lngStep = lngSpan / cosLat > 5 ? 1 : (lngSpan / cosLat > 1 ? 0.5 : 0.1);
+  const lngStart = Math.ceil(west / lngStep) * lngStep;
+  for (let lng = lngStart; lng <= east; lng += lngStep) {
+    const [px] = project(south, lng);
+    doc.line(px, offsetY, px, offsetY + drawH);
+    doc.text(`${lng.toFixed(2)}°E`, px, offsetY + drawH + 3, { align: 'center' });
+  }
+  const latStep = latSpan > 5 ? 1 : (latSpan > 1 ? 0.5 : 0.1);
+  const latStart = Math.ceil(south / latStep) * latStep;
+  for (let lat = latStart; lat <= north; lat += latStep) {
+    const [, py] = project(lat, west);
+    doc.line(offsetX, py, offsetX + drawW, py);
+    doc.text(`${lat.toFixed(2)}°N`, offsetX - 1, py + 1, { align: 'right' });
+  }
+
+  doc.setDrawColor(60, 80, 100);
+  doc.setLineWidth(0.4);
+  doc.rect(offsetX, offsetY, drawW, drawH);
+
+  // 3. Linee rotta: doppio tratto bianco+rosso per visibilità su satellite
+  let segmentsToDraw;
+  if (filterDay !== null) {
+    segmentsToDraw = data.segments.filter(s => s.from_day === filterDay && s.to_day === filterDay);
+  } else {
+    segmentsToDraw = data.segments;
+  }
+  doc.setDrawColor(255, 255, 255);
+  doc.setLineWidth(1.4);
+  segmentsToDraw.forEach(s => {
+    const wpA = data.waypoints[s.from_index - 1];
+    const wpB = data.waypoints[s.to_index - 1];
+    if (!wpA || !wpB) return;
+    const [x1, y1] = project(wpA.lat, wpA.lng);
+    const [x2, y2] = project(wpB.lat, wpB.lng);
+    doc.line(x1, y1, x2, y2);
+  });
+  doc.setDrawColor(220, 38, 38);
+  doc.setLineWidth(0.7);
+  segmentsToDraw.forEach(s => {
+    const wpA = data.waypoints[s.from_index - 1];
+    const wpB = data.waypoints[s.to_index - 1];
+    if (!wpA || !wpB) return;
+    const [x1, y1] = project(wpA.lat, wpA.lng);
+    const [x2, y2] = project(wpB.lat, wpB.lng);
+    doc.line(x1, y1, x2, y2);
+  });
+
+  // 4. Marker
+  const markerData = pts.map(w => {
+    const [px, py] = project(w.lat, w.lng);
+    return { wp: w, px, py };
+  });
+  markerData.forEach(({ wp: w, px, py }) => {
+    const c = TYPE_INFO[w.type];
+    const rgb = hexToRgb(c.color);
+    doc.setFillColor(rgb.r, rgb.g, rgb.b);
+    doc.setDrawColor(255, 255, 255);
+    doc.setLineWidth(0.5);
+    if (c.shape === 'square') {
+      doc.rect(px - 2, py - 2, 4, 4, 'FD');
+    } else if (c.shape === 'diamond') {
+      doc.lines([[2.2,2.2],[2.2,-2.2],[-2.2,-2.2],[-2.2,2.2]], px, py - 2.7, [1,1], 'FD');
+    } else {
+      doc.circle(px, py, 2, 'FD');
+    }
+    if (w.auto) {
+      doc.setDrawColor(245, 158, 11);
+      doc.setLineWidth(0.4);
+      doc.setLineDashPattern([0.5, 0.5], 0);
+      doc.circle(px, py, 2.9, 'D');
+      doc.setLineDashPattern([], 0);
+    }
+    doc.setFontSize(6);
+    doc.setTextColor(255, 255, 255);
+    doc.text(String(w.index), px, py + 0.8, { align: 'center', baseline: 'alphabetic' });
+  });
+
+  // 5. Etichette anti-collisione (solo destinazioni con nome, ordinate per priorità)
+  // Priorità: porto (3) > rada (2) > poi (1). Tra stessa priorità, ordine di indice.
+  const fontName = opts.font || 'helvetica';
+  const safeLabel = (s) => {
+    if (fontName === 'Roboto') return s;
+    return String(s).replace(/[^\u0000-\u00FF]/g, c => {
+      const map = {'š':'s','Š':'S','ć':'c','Ć':'C','č':'c','Č':'C','đ':'d','Đ':'D','ž':'z','Ž':'Z'};
+      return map[c] || c;
+    });
+  };
+  const typePriority = { porto: 3, rada: 2, poi: 1, passaggio: 0 };
+  const maxLabels = filterDay !== null ? 8 : 12;
+  const labelsToPlace = markerData
+    .filter(m => m.wp.type !== 'passaggio' && m.wp.name)
+    .sort((a, b) => {
+      const pa = typePriority[a.wp.type] || 0;
+      const pb = typePriority[b.wp.type] || 0;
+      if (pa !== pb) return pb - pa;
+      return a.wp.index - b.wp.index;
+    })
+    .slice(0, maxLabels)
+    .map(m => {
+      // Nome compatto: tronco a 16 caratteri, ma rimuovo suffissi tipo "(auto)" e "NOTTE x/y"
+      let name = m.wp.name
+        .replace(/\s*-?\s*NOTTE\s*\d+\/?\d*/i, '')
+        .replace(/\s*\(auto\)/i, '')
+        .replace(/\s*-\s*PRANZO/i, ' (pranzo)')
+        .trim();
+      if (name.length > 16) name = name.slice(0, 15) + '…';
+      return { ...m, label: safeLabel(name) };
+    });
+  const placedLabels = [];
+  doc.setFontSize(6);
+  labelsToPlace.forEach(m => {
+    const textW = doc.getTextWidth(m.label) + 2;
+    const textH = 2.5;
+    const candidates = [
+      { x: m.px + 3.5, y: m.py + 0.8, anchor: 'left' },
+      { x: m.px, y: m.py + 5.2, anchor: 'center' },
+      { x: m.px - 3.5, y: m.py + 0.8, anchor: 'right' },
+      { x: m.px, y: m.py - 3.7, anchor: 'center' },
+      { x: m.px + 3.5, y: m.py + 5.2, anchor: 'left' },
+      { x: m.px - 3.5, y: m.py + 5.2, anchor: 'right' },
+      { x: m.px + 3.5, y: m.py - 3.7, anchor: 'left' },
+      { x: m.px - 3.5, y: m.py - 3.7, anchor: 'right' },
+    ];
+    let placed = null;
+    for (const cand of candidates) {
+      const left = cand.anchor === 'left' ? cand.x : (cand.anchor === 'right' ? cand.x - textW : cand.x - textW/2);
+      const right = left + textW;
+      const top = cand.y - textH;
+      const bottom = cand.y + 0.5;
+      if (left < offsetX || right > offsetX + drawW || top < offsetY || bottom > offsetY + drawH) continue;
+      const collidesLabels = placedLabels.some(p => !(right < p.left || left > p.right || bottom < p.top || top > p.bottom));
+      const collidesMarker = markerData.some(mk => {
+        if (mk === m) return false;
+        return !(right < mk.px - 2.5 || left > mk.px + 2.5 || bottom < mk.py - 2.5 || top > mk.py + 2.5);
+      });
+      if (!collidesLabels && !collidesMarker) {
+        placed = { ...cand, left, right, top, bottom };
+        break;
+      }
+    }
+    if (placed) {
+      placedLabels.push(placed);
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(150, 150, 150);
+      doc.setLineWidth(0.1);
+      doc.rect(placed.left - 0.5, placed.top - 0.3, textW + 1, textH + 0.5, 'FD');
+      doc.setTextColor(20, 30, 40);
+      doc.text(m.label, placed.x, placed.y, { align: placed.anchor });
+    }
+  });
+
+  // 6. Legenda
+  doc.setFontSize(7);
+  doc.setTextColor(60, 70, 80);
+  let legY = offsetY + drawH + 7;
+  let legX = offsetX;
+  TYPE_KEYS.forEach(k => {
+    const c = TYPE_INFO[k];
+    const rgb = hexToRgb(c.color);
+    doc.setFillColor(rgb.r, rgb.g, rgb.b);
+    doc.setDrawColor(255, 255, 255);
+    if (c.shape === 'square') doc.rect(legX, legY - 2, 2.5, 2.5, 'FD');
+    else if (c.shape === 'diamond') doc.lines([[1.5,1.5],[1.5,-1.5],[-1.5,-1.5],[-1.5,1.5]], legX + 1.25, legY - 3, [1,1], 'FD');
+    else doc.circle(legX + 1.25, legY - 0.75, 1.25, 'FD');
+    doc.setTextColor(60, 70, 80);
+    doc.text(c.label, legX + 5, legY);
+    legX += doc.getTextWidth(c.label) + 12;
+  });
+}
+
+async function exportPDF() {
+  try {
+    await _exportPDF_internal();
+  } catch (e) {
+    console.error('Export PDF fallito:', e);
+    logLine('ERRORE: ' + e.message, 'err');
+    setProgress(0);
+    alert('Export PDF fallito: ' + e.message + '\n\nGuarda la console del browser (F12) per dettagli.');
+  }
+}
+
+async function _exportPDF_internal() {
+  const data = getRouteData();
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const M = 16;                    // margine standard
+  const FOOTER_Y = pageH - 10;     // baseline footer (sempre nei margini)
+  const CONTENT_W = pageW - 2 * M;
+
+  clearLog();
+  logLine('Generazione PDF...');
+  setProgress(0);
+
+  // ========== SETUP FONT UNICODE (Roboto da jsDelivr) ==========
+  logLine('Carico font Unicode...');
+  const FONT = await setupPdfFont(doc);
+  if (FONT === 'Roboto') {
+    logLine('Font Roboto caricato (caratteri croati supportati)', 'ok');
+  } else {
+    logLine('Roboto non disponibile, uso Helvetica con traslitterazione', 'warn');
+  }
+
+  const totalSteps = 2 + data.days.filter(d => data.waypoints.some(w => w.day === d.number)).length;
+  let stepDone = 0;
+  function tick(label) {
+    stepDone++;
+    setProgress(Math.round(100 * stepDone / totalSteps));
+    if (label) logLine(label, 'ok');
+  }
+  tick('Font caricato');
+
+  // ========== PRE-FETCH SATELLITE COPERTINA ==========
+  logLine('Scarico satellite copertina...');
+  const allLats = data.waypoints.map(w => w.lat);
+  const allLngs = data.waypoints.map(w => w.lng);
+  const cMinLat = Math.min(...allLats), cMaxLat = Math.max(...allLats);
+  const cMinLng = Math.min(...allLngs), cMaxLng = Math.max(...allLngs);
+  const cPadLat = Math.max((cMaxLat - cMinLat) * 0.18, 0.05);
+  const cPadLng = Math.max((cMaxLng - cMinLng) * 0.18, 0.05);
+  const cw = cMinLng - cPadLng, ce = cMaxLng + cPadLng;
+  const cs = cMinLat - cPadLat, cn = cMaxLat + cPadLat;
+  const coverPx = computeSatellitePxSize(cw, cs, ce, cn, 1024);
+  let coverSat = null;
+  try {
+    coverSat = await fetchSatelliteImage(cw, cs, ce, cn, coverPx.pxW, coverPx.pxH, 0.55);
+    if (coverSat) {
+      logLine('Satellite copertina ricevuto', 'ok');
+    } else {
+      logLine('Satellite non disponibile, uso fondo azzurro', 'warn');
+    }
+  } catch (e) {
+    logLine('Satellite errore: ' + e.message, 'warn');
+    coverSat = null;
+  }
+
+  // ========== HELPER: footer pagina ==========
+  function drawFooter(pageLabel) {
+    doc.setFont(FONT, 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(150, 160, 170);
+    const txt = pageLabel ? `${pageLabel} · ${currentRouteName || 'Rotta'}` : (currentRouteName || 'Rotta');
+    doc.text(safeText(txt, FONT), pageW / 2, FOOTER_Y, { align: 'center' });
+  }
+
+  // ========== HELPER: header pagina con titolo adattivo ==========
+  function drawPageHeader(title, subtitle, statline) {
+    drawAdaptiveTitle(doc, safeText(title, FONT), M, M + 4, CONTENT_W, { maxFont: 16, minFont: 11, font: FONT });
+    let cursorY = M + 9;
+    if (subtitle) {
+      doc.setFont(FONT, 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(80, 90, 100);
+      doc.text(safeText(subtitle, FONT), M, cursorY);
+      cursorY += 4.5;
+    }
+    if (statline) {
+      doc.setFont(FONT, 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(40, 50, 60);
+      doc.text(safeText(statline, FONT), M, cursorY);
+      cursorY += 5;
+    }
+    return cursorY;
+  }
+
+  // ============================================================
+  // PAGINA 1: COPERTINA
+  // ============================================================
+  // re-allinea al centro
+  doc.setFont(FONT, 'bold');
+  let coverFont = 22;
+  const routeTitle = safeText(currentRouteName || 'Itinerario Vela', FONT);
+  while (coverFont >= 14 && doc.getTextWidth(routeTitle) > CONTENT_W) {
+    coverFont -= 1;
+    doc.setFontSize(coverFont);
+  }
+  doc.setFontSize(coverFont);
+  // Riscrivo centrato (drawAdaptiveTitle è left-aligned)
+  doc.setFillColor(255, 255, 255);
+  doc.rect(M, 16, CONTENT_W, 12, 'F');
+  doc.setTextColor(30, 58, 138);
+  doc.text(routeTitle, pageW / 2, 24, { align: 'center' });
+
+  doc.setFont(FONT, 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(80, 90, 100);
+  doc.text(`Generato: ${new Date().toLocaleString('it-IT')}`, pageW / 2, 30, { align: 'center' });
+
+  // Box riepilogo (compatto, su 3 righe)
+  const boxY = 36;
+  const boxH = 24;
+  doc.setFillColor(239, 246, 255);
+  doc.setDrawColor(191, 219, 254);
+  doc.rect(M, boxY, CONTENT_W, boxH, 'FD');
+  doc.setFont(FONT, 'normal');
+  doc.setFontSize(9.5);
+  doc.setTextColor(40, 50, 60);
+  const colA = M + 4;
+  const colB = pageW / 2 + 4;
+  doc.text(`Waypoints: ${data.metadata.waypoint_count}`, colA, boxY + 6);
+  doc.text(`Giornate: ${data.metadata.day_count}`, colB, boxY + 6);
+  doc.text(`Distanza: ${fmt(data.metadata.total_distance_nm)} nm  (${fmt(data.metadata.total_distance_km)} km)`, colA, boxY + 12);
+  doc.text(`Tempo: ${data.metadata.total_time_label}  @ ${data.metadata.cruise_speed_kn} kn`, colB, boxY + 12);
+  doc.text(`Profondità min: ${data.metadata.min_depth_threshold_m} m`, colA, boxY + 18);
+
+  doc.setFont(FONT, 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(30, 64, 175);
+  doc.text('Mappa schematica', M, boxY + boxH + 7);
+
+  // Schematico con altezza calcolata: pagH - boxY - boxH - 7 - footer (con 12mm di legenda+padding)
+  const schX = M;
+  const schY = boxY + boxH + 9;
+  const schW = CONTENT_W;
+  const schH = FOOTER_Y - schY - 14;
+  await drawSchematic(doc, schX, schY, schW, schH, data, null, { satelliteDataUrl: coverSat, font: FONT });
+
+  drawFooter('Pianificatore Rotta Vela v5');
+  tick('Copertina pronta');
+
+  // ============================================================
+  // PAGINA 2: TABELLA RIEPILOGO GIORNATE
+  // ============================================================
+  if (data.days.length) {
+    doc.addPage();
+    drawAdaptiveTitle(doc, 'Riepilogo giornate', M, M + 4, CONTENT_W, { font: FONT });
+    doc.autoTable({
+      startY: M + 10,
+      head: [['Giorno', 'Data', 'Nome', 'WP', 'Distanza', 'Tempo']],
+      body: data.days.map(d => {
+        const dateStr = d.date ? new Date(d.date).toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' }) : '—';
+        return [d.number, dateStr, safeText(d.name || '—', FONT), d.waypoint_count, `${fmt(d.distance_nm)} nm`, d.time_label];
+      }),
+      theme: 'striped',
+      styles: { font: FONT, overflow: 'linebreak' },
+      headStyles: { fillColor: [30, 58, 138], textColor: 255, fontSize: 10, font: FONT, fontStyle: 'bold' },
+      bodyStyles: { fontSize: 9, font: FONT },
+      columnStyles: {
+        0: { cellWidth: 14, halign: 'center' },
+        1: { cellWidth: 26 },
+        3: { cellWidth: 12, halign: 'center' },
+        4: { cellWidth: 24, halign: 'right' },
+        5: { cellWidth: 22, halign: 'right' }
+      },
+      margin: { left: M, right: M },
+      didDrawPage: () => drawFooter('Riepilogo')
+    });
+  }
+
+  // ============================================================
+  // UNA PAGINA PER OGNI GIORNATA
+  // ============================================================
+  for (const d of data.days) {
+    const dayWPs = data.waypoints.filter(w => w.day === d.number);
+    if (!dayWPs.length) continue;
+
+    logLine(`Giorno ${d.number}: scarico satellite...`);
+    doc.addPage();
+
+    // Header con titolo adattivo
+    const title = `Giorno ${d.number}${d.name ? ' — ' + d.name : ''}`;
+    const subtitle = d.date ? new Date(d.date).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '';
+    const statline = `${dayWPs.length} waypoint · ${fmt(d.distance_nm)} nm · ${d.time_label}  @ ${data.metadata.cruise_speed_kn} kn`;
+    let cursorY = drawPageHeader(title, subtitle, statline);
+
+    // Note giornata (opzionale, max 2 righe)
+    if (d.notes) {
+      doc.setFont(FONT, 'italic');
+      doc.setFontSize(8);
+      doc.setTextColor(80, 90, 100);
+      const noteLines = doc.splitTextToSize(safeText(d.notes, FONT), CONTENT_W).slice(0, 2);
+      doc.text(noteLines, M, cursorY + 1);
+      cursorY += noteLines.length * 3.5 + 1;
+    }
+
+    // Schematico altezza fissa 75mm (lascia spazio sufficiente alla tabella)
+    const schY = cursorY + 3;
+    const schH = 72;
+    await drawSchematic(doc, M, schY, CONTENT_W, schH, data, d.number, { font: FONT });
+
+    // Tabella waypoint - parte sotto lo schematico + 12mm per legenda
+    const tableStartY = schY + schH + 13;
+
+    const rows = dayWPs.map((w) => {
+      const seg = data.segments.find(s => s.to_index === w.index);
+      const fromDest = w.from_last_dest;
+      const fromDestStr = fromDest
+        ? `da ${fromDest.from_name.length > 18 ? fromDest.from_name.slice(0,17) + '…' : fromDest.from_name}: ${fmt(fromDest.distance_nm)} nm · ${fromDest.time_label}`
+        : '';
+      const nameCell = w.name + (w.auto ? ' (auto)' : '') + (fromDestStr ? '\n' + fromDestStr : '');
+      return [
+        String(w.index),
+        safeText(nameCell, FONT),
+        safeText(w.type_label, FONT),
+        `${w.lat.toFixed(4)}\n${w.lng.toFixed(4)}`,
+        w.depth_m !== null ? `${fmt(w.depth_m, 1)} m` : '—',
+        seg ? `${fmt(seg.distance_nm)} nm` : '—',
+        seg ? seg.time_label : '—',
+        seg ? `${seg.bearing_deg}°` : '—',
+        safeText(w.notes || '', FONT)
+      ];
+    });
+
+    doc.autoTable({
+      startY: tableStartY,
+      head: [['#', 'Nome', 'Tipo', 'Coord.', 'Prof.', 'Dist.', 'Tempo', 'Ril.', 'Note']],
+      body: rows,
+      theme: 'striped',
+      styles: { font: FONT, overflow: 'linebreak' },
+      headStyles: { fillColor: [30, 58, 138], textColor: 255, fontSize: 8, font: FONT, fontStyle: 'bold', halign: 'center' },
+      bodyStyles: { fontSize: 7.5, font: FONT, cellPadding: 1.4, valign: 'middle' },
+      columnStyles: {
+        0: { cellWidth: 6, halign: 'center' },
+        1: { cellWidth: 38 },
+        2: { cellWidth: 16, halign: 'center' },
+        3: { cellWidth: 20, halign: 'center' },
+        4: { cellWidth: 12, halign: 'right' },
+        5: { cellWidth: 14, halign: 'right' },
+        6: { cellWidth: 13, halign: 'right' },
+        7: { cellWidth: 10, halign: 'right' },
+        8: { cellWidth: 'auto' }
+      },
+      margin: { left: M, right: M, bottom: 14 },
+      didParseCell: (cellData) => {
+        if (cellData.section === 'body') {
+          const wp = dayWPs[cellData.row.index];
+          if (wp && wp.auto) {
+            cellData.cell.styles.fillColor = [255, 251, 235];
+          }
+        }
+      },
+      didDrawPage: () => drawFooter(`Giorno ${d.number}`)
+    });
+
+    tick(`Giorno ${d.number} pronto`);
+  }
+
+  // ============================================================
+  // PAGINA WAYPOINT NON ASSEGNATI
+  // ============================================================
+  const unassigned = data.waypoints.filter(w => !w.day);
+  if (unassigned.length) {
+    doc.addPage();
+    drawAdaptiveTitle(doc, 'Waypoint non assegnati', M, M + 4, CONTENT_W, { font: FONT });
+    const rows = unassigned.map(w => [
+      String(w.index), safeText(w.name + (w.auto ? ' (auto)' : ''), FONT), safeText(w.type_label, FONT),
+      `${w.lat.toFixed(4)}, ${w.lng.toFixed(4)}`,
+      w.depth_m !== null ? `${fmt(w.depth_m, 1)} m` : '—', safeText(w.notes || '', FONT)
+    ]);
+    doc.autoTable({
+      startY: M + 10,
+      head: [['#', 'Nome', 'Tipo', 'Coord.', 'Prof.', 'Note']],
+      body: rows,
+      theme: 'striped',
+      styles: { font: FONT, overflow: 'linebreak' },
+      headStyles: { fillColor: [30, 58, 138], textColor: 255, fontSize: 9, font: FONT, fontStyle: 'bold' },
+      bodyStyles: { fontSize: 8, font: FONT },
+      columnStyles: {
+        0: { cellWidth: 8, halign: 'center' },
+        4: { halign: 'right' }
+      },
+      margin: { left: M, right: M },
+      didDrawPage: () => drawFooter('Non assegnati')
+    });
+  }
+
+  setProgress(100);
+  logLine('PDF pronto, avvio download', 'ok');
+  doc.save(`${(currentRouteName || 'rotta').replace(/[^a-z0-9_-]/gi, '_')}_${dateStr()}.pdf`);
+}
+
+// ===========================================
+// IMPORT GPX
+// ===========================================
+function typeFromGPX(pt) {
+  const ext = pt.querySelector('extensions > type, extensions > *|type');
+  if (ext) {
+    const t = ext.textContent.trim();
+    if (TYPE_KEYS.includes(t)) return t;
+  }
+  const typeEl = pt.querySelector(':scope > type');
+  if (typeEl && TYPE_KEYS.includes(typeEl.textContent.trim())) return typeEl.textContent.trim();
+  const sym = (pt.querySelector('sym')?.textContent || '').toLowerCase();
+  if (sym.includes('anchor')) return sym.includes('prohibited') ? 'rada' : 'porto';
+  if (sym === 'waypoint') return 'poi';
+  return 'passaggio';
+}
+
+function importGPX(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const xml = new DOMParser().parseFromString(e.target.result, 'application/xml');
+    let wpts = Array.from(xml.querySelectorAll('wpt'));
+    let pts = wpts.length ? wpts : Array.from(xml.querySelectorAll('rtept'));
+    if (!pts.length) pts = Array.from(xml.querySelectorAll('trkpt'));
+    if (!pts.length) { alert('Nessun punto trovato nel file GPX'); input.value = ''; return; }
+    if (waypoints.length && !confirm(`Importare ${pts.length} punti? I waypoint attuali verranno sostituiti (sono auto-salvati).`)) {
+      input.value = ''; return;
+    }
+    waypoints.forEach(w => map.removeLayer(w.marker));
+    waypoints = [];
+    rebuildSegments();
+    pts.forEach(p => {
+      const lat = parseFloat(p.getAttribute('lat'));
+      const lon = parseFloat(p.getAttribute('lon'));
+      const name = p.querySelector('name')?.textContent || '';
+      const desc = p.querySelector('desc')?.textContent || '';
+      const isAuto = name.toLowerCase().includes('auto');
+      const cleanName = name.replace(/\s*\(auto\)\s*/i, '').trim();
+      const type = typeFromGPX(p);
+      // Prova a estrarre il giorno dalla desc (formato "Giorno N (...)" usato dal nostro export)
+      let day = null;
+      const m = desc.match(/Giorno\s+(\d+)/i);
+      if (m) day = parseInt(m[1], 10);
+      if (!isNaN(lat) && !isNaN(lon)) {
+        insertWaypointAt(L.latLng(lat, lon), waypoints.length, {
+          auto: isAuto, type, name: cleanName, notes: desc, day
+        });
+      }
+    });
+    if (waypoints.length) {
+      map.fitBounds(L.latLngBounds(waypoints.map(w => w.latlng)), { padding: [40, 40] });
+    }
+    input.value = '';
+  };
+  reader.readAsText(file);
+}
+
+// ===========================================
+// CLICK MAPPA + INIT
+// ===========================================
+map.on('click', (e) => addWaypoint(e.latlng));
+
+// Click fuori dai modali per chiuderli
+document.querySelectorAll('.modal-overlay').forEach(o => {
+  o.addEventListener('click', (e) => {
+    if (e.target === o) o.classList.remove('show');
+  });
+});
+
+// Ricarica autosave all'avvio (se presente)
+window.addEventListener('load', () => {
+  const saved = storage.loadAutoSave();
+  if (saved && saved.waypoints && saved.waypoints.length > 0) {
+    storage.deserializeState(saved);
+    showSaveStatus('✓ Recuperato lavoro precedente');
+  } else {
+    updateAll();
+  }
+});
+
+// Salva prima di chiudere
+window.addEventListener('beforeunload', () => {
+  if (isDirty) storage.autoSave();
+});
+</script>
+</body>
+</html>
