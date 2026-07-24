@@ -1,10 +1,10 @@
 {
   "version": 5,
-  "exportedAt": "2026-07-24T14:13:15.953Z",
+  "exportedAt": "2026-07-24T19:49:36.600Z",
   "routes": {
     "La Ciurma 2026 - Family": {
       "version": 5,
-      "savedAt": "2026-06-29T10:35:53.947Z",
+      "savedAt": "2026-07-24T19:45:01.703Z",
       "currentRouteName": "La Ciurma 2026 - Family",
       "days": [
         {
@@ -172,6 +172,16 @@
           "day": 3
         },
         {
+          "lat": 43.087799408158496,
+          "lng": 16.146380795448522,
+          "type": "passaggio",
+          "name": "Deviaz. 12",
+          "notes": "",
+          "auto": true,
+          "depth": 34.359863,
+          "day": 3
+        },
+        {
           "lat": 43.08036119668768,
           "lng": 16.136598587036136,
           "type": "passaggio",
@@ -179,6 +189,16 @@
           "notes": "",
           "auto": false,
           "depth": 3.9636555,
+          "day": 3
+        },
+        {
+          "lat": 43.07567872203173,
+          "lng": 16.14026432775347,
+          "type": "passaggio",
+          "name": "Deviaz. 13",
+          "notes": "",
+          "auto": true,
+          "depth": 76.871635,
           "day": 3
         },
         {
@@ -202,6 +222,16 @@
           "day": 3
         },
         {
+          "lat": 43.08257984022272,
+          "lng": 16.09927147305109,
+          "type": "passaggio",
+          "name": "Deviaz. 15",
+          "notes": "",
+          "auto": true,
+          "depth": 36.637207,
+          "day": 3
+        },
+        {
           "lat": 43.07415452990184,
           "lng": 16.07437133789063,
           "type": "passaggio",
@@ -222,6 +252,16 @@
           "day": 3
         },
         {
+          "lat": 43.04262703642445,
+          "lng": 16.039229630469322,
+          "type": "passaggio",
+          "name": "Deviaz. 17",
+          "notes": "",
+          "auto": true,
+          "depth": 37.7417,
+          "day": 3
+        },
+        {
           "lat": 43.03602303291294,
           "lng": 16.0576343536377,
           "type": "passaggio",
@@ -229,6 +269,16 @@
           "notes": "",
           "auto": false,
           "depth": 21.29004,
+          "day": 3
+        },
+        {
+          "lat": 43.03657473232371,
+          "lng": 16.07490181700166,
+          "type": "passaggio",
+          "name": "Deviaz. 18",
+          "notes": "",
+          "auto": true,
+          "depth": 28.634766,
           "day": 3
         },
         {
@@ -292,6 +342,16 @@
           "day": 4
         },
         {
+          "lat": 43.125341688977386,
+          "lng": 16.383540209553757,
+          "type": "passaggio",
+          "name": "Deviaz. 24",
+          "notes": "",
+          "auto": true,
+          "depth": 72.19141,
+          "day": 4
+        },
+        {
           "lat": 43.15247538874671,
           "lng": 16.404733657836918,
           "type": "passaggio",
@@ -312,6 +372,16 @@
           "day": 4
         },
         {
+          "lat": 43.17303466885291,
+          "lng": 16.398817603293992,
+          "type": "passaggio",
+          "name": "Deviaz. 26",
+          "notes": "",
+          "auto": true,
+          "depth": 39.384804,
+          "day": 4
+        },
+        {
           "lat": 43.167689326624505,
           "lng": 16.398038864135746,
           "type": "passaggio",
@@ -329,6 +399,16 @@
           "notes": "https://www.navily.com/it/mouillage/otok-marinkovac-mlini/14360",
           "auto": false,
           "depth": 18.339672,
+          "day": 5
+        },
+        {
+          "lat": 43.17200756089264,
+          "lng": 16.38800003415645,
+          "type": "passaggio",
+          "name": "Deviaz. 28",
+          "notes": "",
+          "auto": true,
+          "depth": 29.966797,
           "day": 5
         },
         {
@@ -399,6 +479,16 @@
           "notes": "",
           "auto": false,
           "depth": 0.38641357,
+          "day": 6
+        },
+        {
+          "lat": 43.397038044763526,
+          "lng": 16.311402822366176,
+          "type": "passaggio",
+          "name": "Deviaz. 35",
+          "notes": "",
+          "auto": true,
+          "depth": 35.23799,
           "day": 6
         },
         {
