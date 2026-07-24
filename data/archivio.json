@@ -1,0 +1,848 @@
+{
+  "version": 5,
+  "exportedAt": "2026-07-24T14:13:15.953Z",
+  "routes": {
+    "La Ciurma 2026 - Family": {
+      "version": 5,
+      "savedAt": "2026-06-29T10:35:53.947Z",
+      "currentRouteName": "La Ciurma 2026 - Family",
+      "days": [
+        {
+          "number": 1,
+          "date": "2026-08-08",
+          "name": "Trogir → Krknjaši (Drvenik Veli)",
+          "notes": ""
+        },
+        {
+          "number": 2,
+          "date": "2026-08-09",
+          "name": "Krknjaši → Šešula (Šolta)",
+          "notes": ""
+        },
+        {
+          "number": 3,
+          "date": "2026-08-10",
+          "name": "Šolta → Komiža (Vis)",
+          "notes": ""
+        },
+        {
+          "number": 4,
+          "date": "2026-08-11",
+          "name": "Komiža → Stiniva → Pakleni",
+          "notes": ""
+        },
+        {
+          "number": 5,
+          "date": "2026-08-12",
+          "name": "Isole Pakleni → porto Palmizana",
+          "notes": ""
+        },
+        {
+          "number": 6,
+          "date": "2026-08-13",
+          "name": "Palmizana → Relitto Kontesa (Nečujam, Šolta)",
+          "notes": ""
+        },
+        {
+          "number": 7,
+          "date": "2026-08-14",
+          "name": "Kontesa (Nečujam, Šolta) → Trogir",
+          "notes": ""
+        }
+      ],
+      "waypoints": [
+        {
+          "lat": 43.513887572363885,
+          "lng": 16.23717069625855,
+          "type": "porto",
+          "name": "Trogir (partenza)",
+          "notes": "Giorno 1 (Trogir → Krknjaši) — ACI Marina Trogir. Imbarco sabato 8 agosto mattina.",
+          "auto": false,
+          "depth": 3.9686332,
+          "day": 1
+        },
+        {
+          "lat": 43.491537458917996,
+          "lng": 16.183891296386722,
+          "type": "passaggio",
+          "name": "Deviaz. 1",
+          "notes": "",
+          "auto": true,
+          "depth": 50.461254,
+          "day": 1
+        },
+        {
+          "lat": 43.44020674426895,
+          "lng": 16.17672443389893,
+          "type": "rada",
+          "name": "Krknjaši (Blue Lagoon)- NOTTE 1/2",
+          "notes": "Giorno 1 (Trogir → Krknjaši) — Baia Krknjaši tra Drvenik Veli, Krknjaš Mali e Krknjaš Veli. Acqua turchese, fondale sabbioso. Boe del ristorante in alta stagione. Primo bagno tardo pomeriggio, cena a bordo. Notte 1.",
+          "auto": false,
+          "depth": 1.34878,
+          "day": 1
+        },
+        {
+          "lat": 43.436841316403715,
+          "lng": 16.186380386352543,
+          "type": "passaggio",
+          "name": "Deviaz. 3",
+          "notes": "",
+          "auto": true,
+          "depth": 37.260002,
+          "day": 2
+        },
+        {
+          "lat": 43.427803593221164,
+          "lng": 16.18440628051758,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 63.51749,
+          "day": 2
+        },
+        {
+          "lat": 43.40489159464793,
+          "lng": 16.20015621185303,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 7.880947,
+          "day": 2
+        },
+        {
+          "lat": 43.39014228173628,
+          "lng": 16.202001571655277,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 17.701576,
+          "day": 2
+        },
+        {
+          "lat": 43.39201342934111,
+          "lng": 16.209983825683597,
+          "type": "rada",
+          "name": "Šešula (Šolta) NOTTE 2/3",
+          "notes": "Giorno 2 (Krknjaši → Šešula) — Baia profonda e protetta sulla costa ovest di Šolta, vicino a Maslinica. Boe del ristorante Šišmiš. Tuffi dalla barca, eventuale pranzo a Maslinica. Notte 2.",
+          "auto": false,
+          "depth": 4.294628,
+          "day": 2
+        },
+        {
+          "lat": 43.382844254104,
+          "lng": 16.19264602661133,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 17.364258,
+          "day": 3
+        },
+        {
+          "lat": 43.0747501464079,
+          "lng": 16.189856529235843,
+          "type": "poi",
+          "name": "Porto militare Sottomarino",
+          "notes": "https://www.navily.com/it/port/yugoslav-underground-boat-shelter-potkop-parja/35280",
+          "auto": false,
+          "depth": 6.9274893,
+          "day": 3
+        },
+        {
+          "lat": 43.08365235579975,
+          "lng": 16.188268661499027,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 17.00446,
+          "day": 3
+        },
+        {
+          "lat": 43.085689651412295,
+          "lng": 16.16020202636719,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 23.151367,
+          "day": 3
+        },
+        {
+          "lat": 43.08036119668768,
+          "lng": 16.136598587036136,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 3.9636555,
+          "day": 3
+        },
+        {
+          "lat": 43.077163901400745,
+          "lng": 16.133165359497074,
+          "type": "poi",
+          "name": "PRANZO",
+          "notes": "",
+          "auto": false,
+          "depth": 8.149809,
+          "day": 3
+        },
+        {
+          "lat": 43.08117616684163,
+          "lng": 16.126642227172855,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 18.724121,
+          "day": 3
+        },
+        {
+          "lat": 43.07415452990184,
+          "lng": 16.07437133789063,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 32.249023,
+          "day": 3
+        },
+        {
+          "lat": 43.05622062781687,
+          "lng": 16.030597686767578,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 30.017578,
+          "day": 3
+        },
+        {
+          "lat": 43.03602303291294,
+          "lng": 16.0576343536377,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 21.29004,
+          "day": 3
+        },
+        {
+          "lat": 43.04612266163743,
+          "lng": 16.086215972900394,
+          "type": "porto",
+          "name": "Komiža (Vis) NOTTE 3/4 PORTO",
+          "notes": "Giorno 3 (Šolta → Komiža) — Porto di Komiža sulla costa ovest di Vis. Storico per la pesca dell'acciuga. Cena nelle konobe del lungomare. Notte 3.",
+          "auto": false,
+          "depth": 3.8528185,
+          "day": 3
+        },
+        {
+          "lat": 42.99811892521527,
+          "lng": 16.057548522949222,
+          "type": "passaggio",
+          "name": "",
+          "notes": "Doppiaggio della punta sud-ovest di Vis (era etichettato \"Stiniva\" per errore).",
+          "auto": false,
+          "depth": 53.11377,
+          "day": 4
+        },
+        {
+          "lat": 43.024,
+          "lng": 16.17,
+          "type": "poi",
+          "name": "Stiniva — ENTRO LE 9:00",
+          "notes": "Giorno 4 (Komiža → Stiniva → Pakleni) — Baia Stiniva, ingresso strettissimo tra falesie, eletta spiaggia più bella d'Europa 2016. ARRIVARE PRESTO (entro le 9:00): dalle 10 alle 16 le boe sono sature dei tour boat. Niente ancoraggio in baia per profondità eccessiva: boa o stazionamento + tender. Posizione indicativa, verificare sulla mappa.",
+          "auto": false,
+          "depth": 20,
+          "day": 4
+        },
+        {
+          "lat": 43.014061582864024,
+          "lng": 16.21719360351563,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 7.2036133,
+          "day": 4
+        },
+        {
+          "lat": 43.16236800961442,
+          "lng": 16.35520935058594,
+          "type": "rada",
+          "name": "Rada Pakleni (Mlini) NOTTE 4/5",
+          "notes": "Giorno 4 (Komiža → Stiniva → Pakleni) — Rada per la notte tra le isole Pakleni (zona Mlini/Ždrilca), dopo Stiniva e la traversata pomeridiana da Vis. Notte 4. (Waypoint prima etichettato \"Stiniva\" per errore: le coordinate sono qui alle Pakleni.)",
+          "auto": false,
+          "depth": 1.7276444,
+          "day": 4
+        },
+        {
+          "lat": 43.14777896385649,
+          "lng": 16.35375022888184,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 20.419922,
+          "day": 4
+        },
+        {
+          "lat": 43.15247538874671,
+          "lng": 16.404733657836918,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 7.397949,
+          "day": 4
+        },
+        {
+          "lat": 43.16875353440262,
+          "lng": 16.403274536132816,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 10.8671875,
+          "day": 4
+        },
+        {
+          "lat": 43.167689326624505,
+          "lng": 16.398038864135746,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 14.4809265,
+          "day": 4
+        },
+        {
+          "lat": 43.16408975221006,
+          "lng": 16.397438317491492,
+          "type": "porto",
+          "name": "PORTO PALMIZANA NOTTE 5/6",
+          "notes": "https://www.navily.com/it/mouillage/otok-marinkovac-mlini/14360",
+          "auto": false,
+          "depth": 18.339672,
+          "day": 5
+        },
+        {
+          "lat": 43.17056890487839,
+          "lng": 16.37374877929688,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 4.9576206,
+          "day": 5
+        },
+        {
+          "lat": 43.16706331338794,
+          "lng": 16.368856430053714,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 1.5123405,
+          "day": 6
+        },
+        {
+          "lat": 43.213183300738876,
+          "lng": 16.34696960449219,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 84.85196,
+          "day": 6
+        },
+        {
+          "lat": 43.341909124709005,
+          "lng": 16.40739440917969,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 48.990623,
+          "day": 6
+        },
+        {
+          "lat": 43.3683703529552,
+          "lng": 16.408767700195316,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 53.664993,
+          "day": 6
+        },
+        {
+          "lat": 43.40155538353331,
+          "lng": 16.330146789550785,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 50.584995,
+          "day": 6
+        },
+        {
+          "lat": 43.384216599878826,
+          "lng": 16.314697265625004,
+          "type": "poi",
+          "name": "PRANZO + RELITTO",
+          "notes": "",
+          "auto": false,
+          "depth": 0.38641357,
+          "day": 6
+        },
+        {
+          "lat": 43.40779114291992,
+          "lng": 16.32156372070313,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 50.213127,
+          "day": 6
+        },
+        {
+          "lat": 43.41215579256575,
+          "lng": 16.26886367797852,
+          "type": "rada",
+          "name": "RADA NOTTURNA",
+          "notes": "",
+          "auto": false,
+          "depth": 15.545667,
+          "day": 6
+        },
+        {
+          "lat": 43.48705398878506,
+          "lng": 16.200284957885746,
+          "type": "poi",
+          "name": "Pranzo",
+          "notes": "",
+          "auto": false,
+          "depth": 51.93,
+          "day": 7
+        },
+        {
+          "lat": 43.502246623739154,
+          "lng": 16.19590759277344,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 23.671877,
+          "day": 7
+        },
+        {
+          "lat": 43.51376308211682,
+          "lng": 16.238479614257816,
+          "type": "porto",
+          "name": "MARINA TROGIR (The End)",
+          "notes": "",
+          "auto": false,
+          "depth": 3.9475958,
+          "day": 7
+        }
+      ],
+      "config": {
+        "minDepth": 15,
+        "samplesDensity": 3,
+        "cruiseSpeed": 6
+      }
+    },
+    "La Ciurma 2026 - 🏴‍☠️": {
+      "version": 5,
+      "savedAt": "2026-06-07T19:54:47.001Z",
+      "currentRouteName": "La Ciurma 2026 - 🏴‍☠️",
+      "days": [
+        {
+          "number": 1,
+          "date": "2026-08-15",
+          "name": "Rada a Drvenik Mali",
+          "notes": ""
+        },
+        {
+          "number": 2,
+          "date": "2026-08-16",
+          "name": "Relax + Rada a Uvala Tatinja",
+          "notes": ""
+        },
+        {
+          "number": 3,
+          "date": "2026-08-17",
+          "name": "Isole Pakleni + Red Rocks + Rada",
+          "notes": ""
+        },
+        {
+          "number": 4,
+          "date": "2026-08-18",
+          "name": "Porto a Stari Grad",
+          "notes": ""
+        },
+        {
+          "number": 5,
+          "date": "2026-08-19",
+          "name": "Relax + Rada a Uvala Vlaska (T-Swizzle Bay)",
+          "notes": ""
+        },
+        {
+          "number": 6,
+          "date": "2026-08-20",
+          "name": "Relitto di Kontesa + Rada",
+          "notes": ""
+        },
+        {
+          "number": 7,
+          "date": "2026-08-21",
+          "name": "Relax + Rientro in porto Trogir",
+          "notes": ""
+        }
+      ],
+      "waypoints": [
+        {
+          "lat": 43.51469668880737,
+          "lng": 16.23813650587111,
+          "type": "porto",
+          "name": "Marina Trogir",
+          "notes": "",
+          "auto": false,
+          "depth": 3.440888,
+          "day": 1
+        },
+        {
+          "lat": 43.46338699556575,
+          "lng": 16.12690031470268,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 62.58,
+          "day": 1
+        },
+        {
+          "lat": 43.43098208454607,
+          "lng": 16.083640980790374,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 57.655,
+          "day": 1
+        },
+        {
+          "lat": 43.43543681144198,
+          "lng": 16.07367326907911,
+          "type": "passaggio",
+          "name": "Deviaz. 3",
+          "notes": "",
+          "auto": true,
+          "depth": 56.096874,
+          "day": 1
+        },
+        {
+          "lat": 43.443696363984564,
+          "lng": 16.07643122677693,
+          "type": "rada",
+          "name": "Vela Rina",
+          "notes": "Caratteristiche: Una delle baie sabbiose più belle della zona, con un mare turchese accecante. Il fondale è sabbia chiara e offre un tenitore eccellente per l'ancora.\n\nGestione nautica: È molto esposta al 3° e 4° quadrante (Sud e Sud-Ovest). È perfetta per un bagno diurno o un pernotto solo in condizioni di alta pressione stabile o venti settentrionali leggeri (Bora o Maestrale debole). Se c'è Scirocco (Jugo), va evitata perché la risacca entra dritta.\n\nSu Navily: La trovi cercando Uvala Vela Rina.",
+          "auto": false,
+          "depth": 17.817059,
+          "day": 1
+        },
+        {
+          "lat": 43.42823903218544,
+          "lng": 16.075060269981762,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 78.884995,
+          "day": 2
+        },
+        {
+          "lat": 43.38358999237684,
+          "lng": 16.17290413461153,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 67.22656,
+          "day": 2
+        },
+        {
+          "lat": 43.364939102147524,
+          "lng": 16.279163199820314,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 5.164175,
+          "day": 2
+        },
+        {
+          "lat": 43.369929918406285,
+          "lng": 16.283111798542105,
+          "type": "rada",
+          "name": "Uvala Tatinja NOTTE 2/3",
+          "notes": "Caratteristiche: Situata sulla costa sud di Šolta, è conosciuta anche come \"Lonely Paradise\". È una profonda insenatura con diverse diramazioni.\n\nGestione nautica: Offre un ottimo riparo dai venti settentrionali. Il fondale è misto roccia/sabbia. Nelle diramazioni più strette è quasi d'obbligo calare l'ancora e portare due cime a terra a poppa sugli scogli, una manovra che richiede il coordinamento di tutto l'equipaggio.\n\nSu Navily: La trovi cercando Uvala Tatinja.",
+          "auto": false,
+          "depth": 3.1800346,
+          "day": 2
+        },
+        {
+          "lat": 43.16906732043871,
+          "lng": 16.368770658911686,
+          "type": "poi",
+          "name": "Mattinata + pranzo",
+          "notes": "Caratteristiche: Si trova sulla costa Nord dell'isola di Sveti Klement, essenzialmente sul lato opposto rispetto al Marina di Palmižana.\n\nGestione nautica: È una tappa strategica fondamentale. Essendo esposta a Nord, è la rada perfetta in cui rifugiarsi se i venti girano da Sud (Scirocco/Jugo) e la costa sud delle Pakleni diventa impraticabile. Il fondo è fango e alghe, quindi fai incattivire bene l'ancora dando un po' di motore indietro.\n\nSu Navily: Cerca Uvala Vlaka (zona Pakleni).",
+          "auto": false,
+          "depth": 2.1504836,
+          "day": 3
+        },
+        {
+          "lat": 43.17013052414586,
+          "lng": 16.404648041515642,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 17.914062,
+          "day": 3
+        },
+        {
+          "lat": 43.13744652336444,
+          "lng": 16.543692941061398,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 1.3089933,
+          "day": 3
+        },
+        {
+          "lat": 43.13832235219564,
+          "lng": 16.548800435694265,
+          "type": "poi",
+          "name": "Red Rocks",
+          "notes": "Caratteristiche: Non è una vera e propria rada, ma un monumento naturale sulla costa sud di Hvar. Sono scogliere di calcare rosso che scendono verticalmente in mare.\n\nGestione nautica: Il fondale qui è profondissimo a pochissimi metri dalla roccia. Non è un posto dove dare fondo per la notte. L'ideale è arrivare, mantenere i motori accesi con un membro dell'equipaggio al timone che fa \"stazionamento\", mentre gli altri fanno un tuffo a turno per esplorare le micro-grotte.\n\nSu Navily: Red rocks Caves.",
+          "auto": false,
+          "depth": 6.1473837,
+          "day": 3
+        },
+        {
+          "lat": 43.13520549107462,
+          "lng": 16.539911406731324,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 12.293945,
+          "day": 3
+        },
+        {
+          "lat": 43.16074010758553,
+          "lng": 16.482410395180345,
+          "type": "rada",
+          "name": "Mala Milna NOTTE 3/4",
+          "notes": "Caratteristiche: Una minuscola baia sulla costa sud di Hvar (da non confondere con il grande porto di Milna sull'isola di Brač). Ha una bellissima spiaggia di ciottoli circondata dai pini.\n\nGestione nautica: Essendo molto stretta, bisogna dar fondo al centro e legarsi rapidamente a terra con le cime di poppa. Sulla spiaggia c'è una konoba (taverna) molto apprezzata, ideale per scendere tutti con il tender la sera.\n\nSu Navily: Cerca Mala Milna (zona Hvar).",
+          "auto": false,
+          "depth": 9.380281,
+          "day": 3
+        },
+        {
+          "lat": 43.15197464680832,
+          "lng": 16.47399830888021,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 20.14746,
+          "day": 4
+        },
+        {
+          "lat": 43.19166054810678,
+          "lng": 16.353149414062504,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 46.049805,
+          "day": 4
+        },
+        {
+          "lat": 43.211431978331234,
+          "lng": 16.392808789504127,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 48.001953,
+          "day": 4
+        },
+        {
+          "lat": 43.217065561200634,
+          "lng": 16.49785444083353,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 30.810547,
+          "day": 4
+        },
+        {
+          "lat": 43.184401571772035,
+          "lng": 16.58180276117057,
+          "type": "porto",
+          "name": "Stari Grad Porto",
+          "notes": "Il porto di Stari Grad (spesso indicato nei portolani e sulle mappe come Faros) ha una gestione pubblica affidata alla municipalità locale (Komunalno Stari Grad) e funziona in modo molto simile a Komiža: non accetta prenotazioni anticipate. Vale rigorosamente la regola del first come, first served.\n\nEcco come gestire questa tappa, specialmente considerando la pressione dell'altissima stagione di metà agosto:\n\n1. Strategia e orari di arrivo\nPer garantirti un posto, è fondamentale pianificare la navigazione in modo da presentarti all'ingresso dell'insenatura entro le 13:00 - 14:00. Arrivare nel tardo pomeriggio ad agosto significa quasi certamente trovare il porto al completo e dover ripiegare sulle baie limitrofe.\n\n2. Le due opzioni di ormeggio nel porto\nAll'interno del porto cittadino avrai due possibilità, entrambe gestite dagli stessi ormeggiatori:\n\nBanchina Sud (Town Quay): È l'opzione principale. Ci sono i corpi morti (trappe) e l'ormeggio include l'allaccio per acqua e corrente elettrica. Il fondale va dai 2,5 ai 5 metri, quindi perfetto per il pescaggio del Bavaria.\n\nCampo boe (Lato Nord/Centro): Se la banchina è piena, al centro della baia ci sono dei gavitelli. Costano meno della banchina, ma ovviamente non avrai l'attacco diretto a terra per la 220V e dovrai usare il tender per scendere.\n\n3. Procedura e contatti\nQuando inizi a percorrere il lungo fiordo che porta al paese, chiama i marinai sul canale VHF 17 (in alternativa rispondono al +385 91 515 4745). Non ti terranno il posto se sei ancora a miglia di distanza, ma ti indicheranno in tempo reale se puntare dritto alla banchina o se preparare il mezzo marinaio per prendere una boa.\n\n4. Particolarità del porto\nMeteo: È uno dei ripari naturali più antichi e sicuri dell'Adriatico. È protetto da quasi tutto, ma richiede attenzione solo con forte Maestral (Ovest/Nord-Ovest) che si incanala dritto nella baia, o con forte Jugo (Scirocco) che tenendo per più giorni può far alzare notevolmente il livello dell'acqua in banchina.\n\nServizi a terra: Essendo un porto comunale e non un marina privato, non ci sono blocchi bagni/docce attrezzati (sono presenti solo servizi igienici chimici essenziali). Avendo però l'acqua illimitata alla colonnina, si usano comodamente i bagni di bordo. Il grande vantaggio è essere ormeggiati letteralmente nel cuore di un patrimonio UNESCO, con supermercati, forni e ristoranti a due metri dalla passerella.",
+          "auto": false,
+          "depth": 13.074669,
+          "day": 4
+        },
+        {
+          "lat": 43.22469260177564,
+          "lng": 16.506442868860887,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 43.62549,
+          "day": 5
+        },
+        {
+          "lat": 43.23382341936301,
+          "lng": 16.53888634509635,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 25.776855,
+          "day": 5
+        },
+        {
+          "lat": 43.225942894214064,
+          "lng": 16.547126781928807,
+          "type": "rada",
+          "name": "T-Swizzle Bay",
+          "notes": "Caratteristiche: Questa è una chicca divertente. \"T-Swizzle\" è un soprannome della cantante Taylor Swift. La baia, che in realtà è una piccola e anonima insenatura vicino a Rudina (a nord-ovest di Stari Grad), è stata goliardicamente rinominata così su Google Maps dai fan ed è diventata virale.\n\nGestione nautica: Non la troverai sui portolani ufficiali. È una caletta molto selvaggia, ideale per staccarsi dalla folla se passi da nord, ma richiede attenzione in ingresso per rocce affioranti.\n\nSu Navily: Non è mappata con questo nome; devi navigare a vista a nord di Rudina/Stari Grad.",
+          "auto": false,
+          "depth": 5.9207916,
+          "day": 5
+        },
+        {
+          "lat": 43.31217928649624,
+          "lng": 16.400876469305143,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 82.55313,
+          "day": 6
+        },
+        {
+          "lat": 43.35437837016719,
+          "lng": 16.404305885871985,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 47.5,
+          "day": 6
+        },
+        {
+          "lat": 43.39929505110666,
+          "lng": 16.32671761116973,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 46.323334,
+          "day": 6
+        },
+        {
+          "lat": 43.38477960610771,
+          "lng": 16.315898954810123,
+          "type": "rada",
+          "name": "Relitto di Kontesa",
+          "notes": "Caratteristiche: Nella baia di Nečujam si trova il relitto in legno del mercantile \"Kontesa\", affondato negli anni '80 a causa di una burrasca.\n\nGestione nautica: È la tappa perfetta per lo snorkeling perché l'acqua è cristallina. Massima attenzione al pescaggio: il relitto poggia sul fondo, ma le sue parti più alte arrivano a soli 0,5 metri dal pelo dell'acqua. Considerato che la tua chiglia ha bisogno di circa 2 metri d'acqua, non provare ad avvicinarti con lo scafo. Dai fondo nel centro della baia su 5-6 metri di profondità e fai coprire all'equipaggio gli ultimi metri a nuoto o calando il tender.\n\nSu Navily: Cerca Nečujam o Shipwreck Kontesa.",
+          "auto": false,
+          "depth": 5.983875,
+          "day": 6
+        },
+        {
+          "lat": 43.41278002438867,
+          "lng": 16.32482123175259,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 54.033752,
+          "day": 7
+        },
+        {
+          "lat": 43.475471301559,
+          "lng": 16.223716426198337,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 29.625965,
+          "day": 7
+        },
+        {
+          "lat": 43.48543362940803,
+          "lng": 16.221828115323987,
+          "type": "poi",
+          "name": "Pranzo",
+          "notes": "",
+          "auto": false,
+          "depth": 4.902,
+          "day": 7
+        },
+        {
+          "lat": 43.4855590411825,
+          "lng": 16.209983623225707,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 24.85926,
+          "day": 7
+        },
+        {
+          "lat": 43.496207274543856,
+          "lng": 16.187324619200094,
+          "type": "passaggio",
+          "name": "",
+          "notes": "",
+          "auto": false,
+          "depth": 49.388752,
+          "day": 7
+        },
+        {
+          "lat": 43.51335741664666,
+          "lng": 16.238737856608395,
+          "type": "porto",
+          "name": "Marina Trogir",
+          "notes": "",
+          "auto": false,
+          "depth": 3.2298286,
+          "day": 7
+        }
+      ],
+      "config": {
+        "minDepth": 15,
+        "samplesDensity": 3,
+        "cruiseSpeed": 6
+      }
+    }
+  }
+}
