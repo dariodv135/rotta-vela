@@ -659,6 +659,7 @@ const storage = {
     // Pulisci stato corrente
     waypoints.forEach(w => map.removeLayer(w.marker));
     waypoints = [];
+    weatherLayer.clearLayers(); // le frecce vento appartengono alla rotta precedente
     rebuildSegments();
     days = (state.days || []).map(d => ({ ...d }));
     if (opts.setRouteName !== undefined) {
@@ -836,19 +837,32 @@ function updateRouteNameDisplay() {
   el.classList.toggle('dirty', isDirty);
 }
 
+// La rotta senza nome vive solo nell'autosave, che viene sovrascritto subito dopo
+// il wipe: senza questo stash "potrai recuperarla dal menu Rotte" sarebbe falso.
+function stashUnnamedRoute() {
+  if (currentRouteName || !waypoints.length) return null;
+  let name = 'Recupero ' + new Date().toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'medium' });
+  let i = 2;
+  while (storage.listRoutes().includes(name)) name = name + ' (' + (i++) + ')';
+  return storage.saveRoute(name) ? name : null;
+}
+
 function newRoute() {
   if (waypoints.length && !confirm('Iniziare una nuova rotta? La rotta corrente è auto-salvata e potrai recuperarla dal menu Rotte.')) return;
   // Salva eventuali modifiche
   if (currentRouteName && isDirty) storage.saveRoute(currentRouteName);
+  const stash = stashUnnamedRoute();
   waypoints.forEach(w => map.removeLayer(w.marker));
   waypoints = [];
   days = [];
+  weatherLayer.clearLayers();
   rebuildSegments();
   currentRouteName = null;
   isDirty = false;
   updateRouteNameDisplay();
   updateAll();
   storage.autoSave();
+  if (stash) showSaveStatus(`✓ Precedente salvata come "${stash}"`);
 }
 
 // ===========================================
@@ -917,8 +931,9 @@ function saveCurrentRouteAs() {
 function loadRouteFromUI(name) {
   if (waypoints.length && isDirty && !confirm('Caricare questa rotta? La corrente verrà sostituita (è auto-salvata).')) return;
   if (currentRouteName && isDirty) storage.saveRoute(currentRouteName);
+  const stash = stashUnnamedRoute();
   if (storage.loadRoute(name)) {
-    showSaveStatus('✓ Caricata "' + name + '"');
+    showSaveStatus('✓ Caricata "' + name + '"' + (stash ? ` · precedente salvata come "${stash}"` : ''));
     closeModal('modal-routes');
   } else {
     alert('Caricamento fallito');
@@ -990,9 +1005,11 @@ function importArchive(input) {
         state.currentRouteName = finalName;
         localStorage.setItem(LS_ROUTE(finalName), JSON.stringify(state));
         if (!existing.includes(finalName)) existing.push(finalName);
+        // Indice aggiornato a ogni rotta: se la quota localStorage si esaurisce
+        // a metà ciclo, le rotte già scritte restano raggiungibili (niente orfani)
+        localStorage.setItem(LS_ROUTES_INDEX, JSON.stringify(existing));
         imported++;
       });
-      localStorage.setItem(LS_ROUTES_INDEX, JSON.stringify(existing));
       alert(`Importate ${imported} rotte`);
       refreshRoutesList();
       input.value = '';
@@ -1073,7 +1090,24 @@ function refreshDaysList() {
   });
 }
 
+// Se c'è un form di modifica giornata aperto, salva i valori digitati prima di
+// ri-renderizzare la lista: altrimenti il refresh li scarterebbe in silenzio.
+function commitOpenDayEdit() {
+  if (editingDayNumber === null) return;
+  const list = document.getElementById('days-list');
+  const nameEl = list.querySelector('.de-name');
+  const d = days.find(x => x.number === editingDayNumber);
+  if (nameEl && d) {
+    d.name = nameEl.value.trim();
+    d.date = list.querySelector('.de-date').value || null;
+    d.notes = list.querySelector('.de-notes').value.trim();
+    markDirty();
+  }
+  editingDayNumber = null;
+}
+
 function addDay() {
+  commitOpenDayEdit();
   const date = document.getElementById('new-day-date').value || null;
   const name = document.getElementById('new-day-name').value.trim();
   const nextNumber = days.length ? Math.max(...days.map(d => d.number)) + 1 : 1;
@@ -1086,12 +1120,15 @@ function addDay() {
 }
 
 function editDay(number) {
+  if (editingDayNumber !== null && editingDayNumber !== number) commitOpenDayEdit();
   editingDayNumber = number;
   refreshDaysList();
 }
 
 function deleteDay(number) {
   if (!confirm(`Eliminare il giorno ${number}? I waypoint assegnati rimangono ma diventano "non assegnati".`)) return;
+  if (editingDayNumber === number) editingDayNumber = null;
+  else commitOpenDayEdit();
   days = days.filter(d => d.number !== number);
   waypoints.forEach(w => { if (w.day === number) w.day = null; });
   refreshDaysList();
@@ -1156,20 +1193,28 @@ function fetchDepth(lat, lng) {
   return p;
 }
 
-// Scarica le profondità di una lista di punti con un pool di fetch paralleli.
-async function fetchDepthsPool(points, concurrency = DEPTH_CONCURRENCY, onEach = null) {
-  const results = new Array(points.length);
+// Esegue fn su ogni item con al massimo `concurrency` esecuzioni parallele.
+async function mapPool(items, concurrency, fn) {
+  const results = new Array(items.length);
   let next = 0;
   async function worker() {
     while (true) {
       const i = next++;
-      if (i >= points.length) return;
-      results[i] = await fetchDepth(points[i].lat, points[i].lng);
-      if (onEach) onEach(i, results[i]);
+      if (i >= items.length) return;
+      results[i] = await fn(items[i], i);
     }
   }
-  await Promise.all(Array.from({ length: Math.min(concurrency, points.length) }, worker));
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
   return results;
+}
+
+// Scarica le profondità di una lista di punti con un pool di fetch paralleli.
+function fetchDepthsPool(points, concurrency = DEPTH_CONCURRENCY, onEach = null) {
+  return mapPool(points, concurrency, async (p, i) => {
+    const d = await fetchDepth(p.lat, p.lng);
+    if (onEach) onEach(i, d);
+    return d;
+  });
 }
 function sampleSegment(a, b) {
   const distNm = distanceNm(a, b);
@@ -1237,19 +1282,24 @@ function refreshMarkerLabels() {
   waypoints.forEach((w, i) => {
     w.marker.setIcon(makeIcon(i+1, w.type, w.auto, w.day));
     const dayLabel = w.day ? ` G${w.day}` : '';
-    const tooltip = `WP${i+1}${dayLabel}${w.name ? ' ' + w.name : ''} (${TYPE_INFO[w.type].label}${w.auto ? ', auto' : ''})`;
+    // escapeHtml: Leaflet inserisce il tooltip via innerHTML, un nome con markup
+    // (importato da GPX o digitato) verrebbe eseguito
+    const tooltip = `WP${i+1}${dayLabel}${w.name ? ' ' + escapeHtml(w.name) : ''} (${TYPE_INFO[w.type].label}${w.auto ? ', auto' : ''})`;
     w.marker.bindTooltip(tooltip);
   });
 }
 
 async function updateDepthFor(wp) {
+  const key = cacheKey(wp.latlng.lat, wp.latlng.lng);
   wp.depth = undefined;
   updateList();
   const d = await fetchDepth(wp.latlng.lat, wp.latlng.lng);
-  if (waypoints.includes(wp)) {
-    wp.depth = d;
-    updateList();
-  }
+  if (!waypoints.includes(wp)) return;
+  // Il WP può essere stato ri-trascinato mentre la fetch era in volo:
+  // scrivi solo se la posizione è ancora quella richiesta
+  if (cacheKey(wp.latlng.lat, wp.latlng.lng) !== key) return;
+  wp.depth = d;
+  updateList();
 }
 
 // ===========================================
@@ -1320,6 +1370,7 @@ function clearAll() {
   if (!confirm('Eliminare tutti i waypoint?')) return;
   waypoints.forEach(w => map.removeLayer(w.marker));
   waypoints = [];
+  weatherLayer.clearLayers();
   rebuildSegments();
   updateStats();
   updateList();
@@ -1330,16 +1381,21 @@ function clearAll() {
 // ===========================================
 // EDIT POPUP
 // ===========================================
+// Riferimento al waypoint in modifica nel popup. Gli handler risolvono l'indice
+// al momento del click: un indice "cotto" nell'HTML colpirebbe il waypoint
+// sbagliato se la rotta cambia mentre il popup è aperto.
+let editingWp = null;
+
 function openEditPopup(wp) {
-  const idx = waypoints.indexOf(wp);
-  if (idx < 0) return;
+  if (waypoints.indexOf(wp) < 0) return;
+  editingWp = wp;
   const dayOptions = [
     `<option value="">— Nessuna —</option>`,
     ...days.map(d => `<option value="${d.number}" ${wp.day === d.number ? 'selected' : ''}>G${d.number}${d.name ? ' — ' + escapeHtml(d.name) : ''}</option>`),
     `<option value="__new__">+ Nuova giornata...</option>`
   ].join('');
   const html = `
-    <div class="edit-form" id="edit-form-${idx}">
+    <div class="edit-form" id="edit-form">
       <label>Nome
         <input type="text" id="ef-name" value="${escapeHtml(wp.name)}" placeholder="es. Marina Trogir">
       </label>
@@ -1349,7 +1405,7 @@ function openEditPopup(wp) {
         </select>
       </label>
       <label>Giornata
-        <select id="ef-day" onchange="if(this.value==='__new__'){this.value='';quickAddDay(${idx});}">
+        <select id="ef-day" onchange="if(this.value==='__new__'){this.value='';quickAddDay();}">
           ${dayOptions}
         </select>
       </label>
@@ -1357,9 +1413,9 @@ function openEditPopup(wp) {
         <textarea id="ef-notes" placeholder="ormeggio, contatti...">${escapeHtml(wp.notes)}</textarea>
       </label>
       <div class="btn-row">
-        <button class="delete" onclick="deleteFromEdit(${idx})" title="Elimina waypoint">🗑</button>
+        <button class="delete" onclick="deleteFromEdit()" title="Elimina waypoint">🗑</button>
         <button class="cancel" onclick="closeEditPopup()">Chiudi</button>
-        <button class="save" onclick="saveEdit(${idx})">💾 Salva</button>
+        <button class="save" onclick="saveEdit()">💾 Salva</button>
       </div>
     </div>
   `;
@@ -1368,39 +1424,45 @@ function openEditPopup(wp) {
   wp.marker.openPopup();
 }
 
-function quickAddDay(idxToReturnTo) {
+function quickAddDay() {
+  const wp = editingWp;
   const name = prompt('Nome della nuova giornata (es. "Trogir → Vis"):', '');
   if (name === null) return;
-  const date = prompt('Data (YYYY-MM-DD, vuoto per nessuna):', '');
-  if (date === null) return;
+  let date = (prompt('Data (YYYY-MM-DD, vuoto per nessuna):', '') || '').trim();
+  if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    alert('Data non valida (usa AAAA-MM-GG). Giornata creata senza data: puoi impostarla dal menu Giornate.');
+    date = '';
+  }
   const nextNumber = days.length ? Math.max(...days.map(d => d.number)) + 1 : 1;
-  days.push({ number: nextNumber, date: date.trim() || null, name: name.trim(), notes: '' });
+  days.push({ number: nextNumber, date: date || null, name: name.trim(), notes: '' });
   markDirty();
   // Ri-apre il popup con la giornata appena creata pre-selezionata
   closeEditPopup();
-  if (waypoints[idxToReturnTo]) {
-    waypoints[idxToReturnTo].day = nextNumber;
+  if (wp && waypoints.includes(wp)) {
+    wp.day = nextNumber;
     refreshMarkerLabels();
     updateList();
-    setTimeout(() => openEditPopup(waypoints[idxToReturnTo]), 100);
+    setTimeout(() => openEditPopup(wp), 100);
   }
 }
 
 function closeEditPopup() { map.closePopup(); }
 
-function deleteFromEdit(idx) {
-  const wp = waypoints[idx];
-  if (!wp) return;
+function deleteFromEdit() {
+  const wp = editingWp;
+  const idx = waypoints.indexOf(wp);
+  if (!wp || idx < 0) return;
   const label = wp.name ? `"${wp.name}"` : `WP${idx+1}`;
   if (!confirm(`Eliminare il waypoint ${label}?`)) return;
   closeEditPopup();
   removeWaypoint(idx);
 }
 
-function saveEdit(idx) {
-  const wp = waypoints[idx];
-  if (!wp) return;
-  const form = document.getElementById(`edit-form-${idx}`);
+function saveEdit() {
+  const wp = editingWp;
+  const idx = waypoints.indexOf(wp);
+  if (!wp || idx < 0) return;
+  const form = document.getElementById('edit-form');
   if (!form) return;
   wp.name = form.querySelector('#ef-name').value.trim();
   wp.type = form.querySelector('#ef-type').value;
@@ -1425,7 +1487,14 @@ function segmentStyle(status) {
     default:         return { color: '#2563eb', weight: 4, opacity: 0.85, dashArray: null };
   }
 }
+// Epoch della geometria: incrementa a ogni mutazione della rotta. Le operazioni
+// async (verifica, auto-correzione) lo catturano all'avvio e scartano i propri
+// risultati se nel frattempo la rotta è cambiata — altrimenti applicherebbero
+// profondità calcolate su coordinate vecchie a segmenti nuovi.
+let routeEpoch = 0;
+
 function rebuildSegments() {
+  routeEpoch++;
   segments.forEach(s => map.removeLayer(s.polyline));
   segments = [];
   for (let i = 0; i < waypoints.length - 1; i++) {
@@ -1458,46 +1527,80 @@ function invalidateValidation() {
 // ===========================================
 // VALIDAZIONE + AUTO-CORREZIONE
 // ===========================================
+let depthCheckBusy = false; // impedisce verifica e auto-correzione concorrenti
+
 async function validateRoute() {
+  if (depthCheckBusy) return;
   if (waypoints.length < 2) { alert('Servono almeno 2 waypoint'); return; }
   const minDepth = getMinDepth();
+  const epoch = routeEpoch;
+  depthCheckBusy = true;
   document.getElementById('btn-validate').disabled = true;
-  clearLog();
-  logLine(`Verifica con prof. min. ${minDepth} m`);
-  // Campiona tutti i segmenti, poi scarica le profondità in parallelo (pool)
-  const segSamples = segments.map((_, i) => sampleSegment(waypoints[i].latlng, waypoints[i+1].latlng));
-  const allSamples = segSamples.flat();
-  segments.forEach((_, i) => setSegmentStatus(i, 'checking'));
-  let done = 0;
-  const allDepths = await fetchDepthsPool(allSamples, DEPTH_CONCURRENCY, () => {
-    done++;
-    setProgress(Math.round(100 * done / Math.max(1, allSamples.length)));
-  });
-  let shallowCount = 0, cursor = 0;
-  segSamples.forEach((samples, i) => {
-    const depths = allDepths.slice(cursor, cursor + samples.length);
-    cursor += samples.length;
-    const valid = depths.filter(d => d !== null);
-    const minD = valid.length ? Math.min(...valid) : null;
-    const isShallow = depths.some(d => d !== null && d < minDepth);
-    if (isShallow) {
-      shallowCount++;
-      logLine(`✗ Segm. ${i+1}: min ${fmt(minD, 1)} m`, 'warn');
-      setSegmentStatus(i, 'shallow', minD);
-    } else {
-      logLine(`✓ Segm. ${i+1}: min ${fmt(minD, 1)} m`, 'ok');
-      setSegmentStatus(i, 'safe', minD);
+  document.getElementById('btn-correct').disabled = true;
+  try {
+    clearLog();
+    logLine(`Verifica con prof. min. ${minDepth} m`);
+    // Campiona tutti i segmenti, poi scarica le profondità in parallelo (pool)
+    const segSamples = segments.map((_, i) => sampleSegment(waypoints[i].latlng, waypoints[i+1].latlng));
+    const allSamples = segSamples.flat();
+    segments.forEach((_, i) => setSegmentStatus(i, 'checking'));
+    let done = 0;
+    const allDepths = await fetchDepthsPool(allSamples, DEPTH_CONCURRENCY, () => {
+      done++;
+      setProgress(Math.round(100 * done / Math.max(1, allSamples.length)));
+    });
+    if (epoch !== routeEpoch) {
+      // La rotta è cambiata durante le fetch: i campioni si riferiscono a
+      // coordinate vecchie, applicarli marcherebbe "sicura" una geometria mai verificata
+      logLine('Rotta modificata durante la verifica: risultato scartato. Riverifica.', 'warn');
+      invalidateValidation();
+      setProgress(100);
+      return;
     }
-  });
-  const status = document.getElementById('route-status');
-  if (shallowCount === 0) {
-    status.textContent = '✓ Sicura'; status.className = 'ok';
-  } else {
-    status.textContent = `⚠ ${shallowCount} segm. bassi`; status.className = 'warn';
-    document.getElementById('btn-correct').disabled = false;
+    let shallowCount = 0, noDataCount = 0, cursor = 0;
+    segSamples.forEach((samples, i) => {
+      const depths = allDepths.slice(cursor, cursor + samples.length);
+      cursor += samples.length;
+      const valid = depths.filter(d => d !== null);
+      const minD = valid.length ? Math.min(...valid) : null;
+      const isShallow = depths.some(d => d !== null && d < minDepth);
+      if (!valid.length) {
+        noDataCount++;
+        logLine(`? Segm. ${i+1}: nessun dato (rete assente o EMODnet giù)`, 'warn');
+        setSegmentStatus(i, 'pending');
+      } else if (isShallow) {
+        shallowCount++;
+        logLine(`✗ Segm. ${i+1}: min ${fmt(minD, 1)} m`, 'warn');
+        setSegmentStatus(i, 'shallow', minD);
+      } else {
+        logLine(`✓ Segm. ${i+1}: min ${fmt(minD, 1)} m`, 'ok');
+        setSegmentStatus(i, 'safe', minD);
+      }
+    });
+    // Approfitta della cache appena riempita per sanare i badge profondità dei WP
+    let healed = false;
+    waypoints.forEach(w => {
+      if (w.depth !== null) return;
+      const d = depthCache.get(cacheKey(w.latlng.lat, w.latlng.lng));
+      if (d !== undefined) { w.depth = d; healed = true; }
+    });
+    if (healed) updateList();
+    const status = document.getElementById('route-status');
+    if (shallowCount === 0 && noDataCount === 0) {
+      status.textContent = '✓ Sicura'; status.className = 'ok';
+    } else if (shallowCount === 0) {
+      // Nessun dato ≠ sicura: non dichiarare mai "Sicura" senza batimetria ricevuta
+      status.textContent = `⚠ ${noDataCount} segm. senza dati`; status.className = 'warn';
+    } else {
+      status.textContent = `⚠ ${shallowCount} segm. bassi${noDataCount ? ` · ${noDataCount} senza dati` : ''}`;
+      status.className = 'warn';
+      document.getElementById('btn-correct').disabled = false;
+    }
+    setProgress(100);
+  } finally {
+    depthCheckBusy = false;
+    document.getElementById('btn-validate').disabled = false;
   }
-  document.getElementById('btn-validate').disabled = false;
-  setProgress(100);
 }
 
 async function isSegmentClear(a, b, minDepth) {
@@ -1522,42 +1625,61 @@ async function findDetour(a, b, minDepth) {
   return null;
 }
 async function autoCorrect() {
+  if (depthCheckBusy) return;
   const minDepth = getMinDepth();
+  depthCheckBusy = true;
   document.getElementById('btn-correct').disabled = true;
   document.getElementById('btn-validate').disabled = true;
-  clearLog();
-  logLine(`Auto-correzione (min ${minDepth} m)...`);
-  let corrected = 0, failed = 0, processed = 0;
-  const totalShallow = segments.filter(s => s.status === 'shallow').length;
-  let idx = 0;
-  while (idx < segments.length) {
-    if (segments[idx].status === 'shallow') {
+  try {
+    clearLog();
+    logLine(`Auto-correzione (min ${minDepth} m)...`);
+    // Snapshot degli indici bassi PRIMA del loop: l'inserimento di un WP fa
+    // rebuildSegments() che azzera tutti gli status a 'pending', quindi non si
+    // può più iterare cercando status==='shallow' a metà lavoro
+    const shallowIdxs = segments.map((s, i) => s.status === 'shallow' ? i : -1).filter(i => i >= 0);
+    let epoch = routeEpoch;
+    let corrected = 0, failed = 0, processed = 0, aborted = false;
+    let offset = 0; // ogni WP inserito sposta di +1 gli indici dei segmenti successivi
+    for (const origIdx of shallowIdxs) {
+      const idx = origIdx + offset;
+      if (idx + 1 >= waypoints.length) break;
       processed++;
       const a = waypoints[idx].latlng, b = waypoints[idx+1].latlng;
-      logLine(`Cerco deviazione segm. ${idx+1}...`);
-      setProgress(Math.round(100 * processed / Math.max(1, totalShallow)));
+      logLine(`Cerco deviazione segm. ${origIdx+1}...`);
+      setProgress(Math.round(100 * processed / Math.max(1, shallowIdxs.length)));
       const detour = await findDetour(a, b, minDepth);
+      if (epoch !== routeEpoch) {
+        // L'utente ha modificato la rotta durante la ricerca: gli indici non
+        // corrispondono più, inserire ora corromperebbe la rotta
+        logLine('Rotta modificata durante l\'auto-correzione: interrotta. Riverifica.', 'warn');
+        aborted = true;
+        break;
+      }
       if (detour) {
         // Eredita giornata dal waypoint di partenza
         insertWaypointAt(detour.latlng, idx + 1, {
           auto: true, type: 'passaggio',
-          name: `Deviaz. ${idx+1}`,
+          name: `Deviaz. ${origIdx+1}`,
           day: waypoints[idx].day
         });
+        epoch = routeEpoch; // l'inserimento stesso è una mutazione attesa
         logLine(`  ✓ ${fmt(detour.offsetNm, 1)} nm ${detour.side > 0 ? 'dx' : 'sx'}`, 'ok');
         corrected++;
-        idx += 2;
+        offset++;
       } else {
         logLine(`  ✗ Vai a mano.`, 'err');
-        failed++; idx++;
+        failed++;
       }
-    } else { idx++; }
+    }
+    setProgress(100);
+    if (corrected) logLine(`Inseriti ${corrected} WP. Riverifica.`, 'ok');
+    if (failed) logLine(`${failed} segm. senza soluzione`, 'warn');
+    if (!aborted && !processed) logLine('Nessun segmento basso da correggere.', 'warn');
+    invalidateValidation();
+  } finally {
+    depthCheckBusy = false;
+    document.getElementById('btn-validate').disabled = false;
   }
-  setProgress(100);
-  if (corrected) logLine(`Inseriti ${corrected} WP. Riverifica.`, 'ok');
-  if (failed) logLine(`${failed} segm. senza soluzione`, 'warn');
-  document.getElementById('btn-validate').disabled = false;
-  invalidateValidation();
 }
 
 // ===========================================
@@ -1652,10 +1774,16 @@ function renderWaypointLi(w, i) {
       ${depthBadge(w)}
     </div>
     <div class="actions-mini">
-      <button class="edit" onclick="openEditPopup(waypoints[${i}])" title="Modifica">✎</button>
-      <button class="del" onclick="removeWaypoint(${i})" title="Rimuovi">×</button>
+      <button class="edit" title="Modifica">✎</button>
+      <button class="del" title="Rimuovi">×</button>
     </div>
   `;
+  // Risolvi l'indice al click, non al render: la lista può essere stantia
+  li.querySelector('button.edit').onclick = () => openEditPopup(w);
+  li.querySelector('button.del').onclick = () => {
+    const cur = waypoints.indexOf(w);
+    if (cur >= 0) removeWaypoint(cur);
+  };
   return li;
 }
 
@@ -1874,7 +2002,7 @@ function exportGPX() {
   const now = new Date().toISOString();
   let gpx = `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="Pianificatore Rotta Vela v6" xmlns="http://www.topografix.com/GPX/1/1">
-  <metadata><time>${now}</time><name>${escapeHtml(currentRouteName || 'Rotta vela')}</name></metadata>
+  <metadata><name>${escapeHtml(currentRouteName || 'Rotta vela')}</name><time>${now}</time></metadata>
 `;
   waypoints.forEach((w, i) => {
     const name = (w.name ? w.name : `WP${i+1}`) + (w.auto ? ' (auto)' : '');
@@ -2803,30 +2931,49 @@ function importGPX(input) {
     let wpts = Array.from(xml.querySelectorAll('wpt'));
     let pts = wpts.length ? wpts : Array.from(xml.querySelectorAll('rtept'));
     if (!pts.length) pts = Array.from(xml.querySelectorAll('trkpt'));
-    if (!pts.length) { alert('Nessun punto trovato nel file GPX'); input.value = ''; return; }
-    if (waypoints.length && !confirm(`Importare ${pts.length} punti? I waypoint attuali verranno sostituiti (sono auto-salvati).`)) {
-      input.value = ''; return;
-    }
-    waypoints.forEach(w => map.removeLayer(w.marker));
-    waypoints = [];
-    rebuildSegments();
+    // Parsa PRIMA di toccare la rotta corrente: se il file non contiene punti
+    // validi non va distrutto nulla (né rotta né autosave)
+    const parsed = [];
+    const dayMeta = new Map(); // numero giorno -> nome giornata (da "Giorno N (nome)")
     pts.forEach(p => {
       const lat = parseFloat(p.getAttribute('lat'));
       const lon = parseFloat(p.getAttribute('lon'));
+      if (isNaN(lat) || isNaN(lon)) return;
       const name = p.querySelector('name')?.textContent || '';
       const desc = p.querySelector('desc')?.textContent || '';
       const isAuto = name.toLowerCase().includes('auto');
       const cleanName = name.replace(/\s*\(auto\)\s*/i, '').trim();
       const type = typeFromGPX(p);
-      // Prova a estrarre il giorno dalla desc (formato "Giorno N (...)" usato dal nostro export)
+      // Estrae giorno e nome giornata dalla desc ("Giorno N (nome) — note" del nostro export)
       let day = null;
-      const m = desc.match(/Giorno\s+(\d+)/i);
-      if (m) day = parseInt(m[1], 10);
-      if (!isNaN(lat) && !isNaN(lon)) {
-        insertWaypointAt(L.latLng(lat, lon), waypoints.length, {
-          batch: true, auto: isAuto, type, name: cleanName, notes: desc, day
-        });
+      const m = desc.match(/Giorno\s+(\d+)(?:\s*\(([^)]*)\))?/i);
+      if (m) {
+        day = parseInt(m[1], 10);
+        if (!dayMeta.has(day)) dayMeta.set(day, (m[2] || '').trim());
       }
+      // Toglie il prefisso "Giorno N (...) — " dalle note: l'export lo riaggiunge,
+      // senza strip si duplicherebbe a ogni ciclo export/import
+      const notes = desc.replace(/^Giorno\s+\d+(?:\s*\([^)]*\))?(?:\s*—\s*)?/i, '').trim();
+      parsed.push({ lat, lon, isAuto, cleanName, type, day, notes });
+    });
+    if (!parsed.length) { alert('Nessun punto valido trovato nel file GPX'); input.value = ''; return; }
+    if (waypoints.length && !confirm(`Importare ${parsed.length} punti? Waypoint e giornate attuali verranno sostituiti (la rotta è auto-salvata).`)) {
+      input.value = ''; return;
+    }
+    const stash = stashUnnamedRoute();
+    waypoints.forEach(w => map.removeLayer(w.marker));
+    waypoints = [];
+    // Ricrea le giornate presenti nel GPX: senza voci in days i WP con giorno
+    // assegnato sparirebbero dalla sidebar (o verrebbero agganciati a giornate
+    // residue di un'altra rotta con gli stessi numeri)
+    days = [...dayMeta.entries()].sort((a, b) => a[0] - b[0])
+      .map(([number, dname]) => ({ number, date: null, name: dname, notes: '' }));
+    weatherLayer.clearLayers();
+    rebuildSegments();
+    parsed.forEach(p => {
+      insertWaypointAt(L.latLng(p.lat, p.lon), waypoints.length, {
+        batch: true, auto: p.isAuto, type: p.type, name: p.cleanName, notes: p.notes, day: p.day
+      });
     });
     // Refresh unico a fine import (modalità batch)
     refreshMarkerLabels();
@@ -2836,6 +2983,7 @@ function importGPX(input) {
     invalidateValidation();
     refreshMissingDepths();
     markDirty();
+    if (stash) showSaveStatus(`✓ Precedente salvata come "${stash}"`);
     if (waypoints.length) {
       map.fitBounds(L.latLngBounds(waypoints.map(w => w.latlng)), { padding: [40, 40] });
     }
@@ -2866,6 +3014,7 @@ async function fetchWeather(lat, lng, date) {
   if (weatherCache.has(key)) return weatherCache.get(key);
   const common = `latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}&start_date=${date}&end_date=${date}&timezone=auto`;
   let wind = null, wave = null;
+  let transient = false; // errore di rete/HTTP: non cachare, così un retry rifà la fetch
   try {
     const r = await fetch(`https://api.open-meteo.com/v1/forecast?${common}&hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=kn`);
     if (r.ok) {
@@ -2874,8 +3023,10 @@ async function fetchWeather(lat, lng, date) {
       if (idx >= 0 && h.wind_speed_10m[idx] !== null) {
         wind = { speed: h.wind_speed_10m[idx], dir: h.wind_direction_10m[idx], gust: h.wind_gusts_10m[idx] };
       }
+    } else {
+      transient = true; // 429/5xx: riprovabile
     }
-  } catch (e) { /* offline o API giù */ }
+  } catch (e) { transient = true; /* offline o API giù */ }
   try {
     const r = await fetch(`https://marine-api.open-meteo.com/v1/marine?${common}&hourly=wave_height`);
     if (r.ok) {
@@ -2883,9 +3034,10 @@ async function fetchWeather(lat, lng, date) {
       const idx = h && h.time ? h.time.findIndex(t => t.endsWith('12:00')) : -1;
       if (idx >= 0) wave = h.wave_height[idx];
     }
-  } catch (e) { /* punto fuori dalla griglia marina: solo vento */ }
+    // !r.ok qui può essere "punto fuori dalla griglia marina": non è transitorio
+  } catch (e) { transient = true; /* rete: riprovabile */ }
   const result = wind ? { ...wind, wave } : null;
-  weatherCache.set(key, result);
+  if (!transient) weatherCache.set(key, result); // gli errori transitori non si cacheano
   return result;
 }
 
@@ -2909,7 +3061,16 @@ async function loadWeather() {
     weatherPointsForDay(d.number).forEach(wp => tasks.push({ wp, day: d }));
   });
   if (!tasks.length) {
-    alert(`Nessuna giornata con data nei prossimi ${WEATHER_MAX_DAYS} giorni.\nAssegna le date alle giornate (menu Giornate) per vedere le previsioni.`);
+    // Distingui i casi: niente date valide vs date fuori orizzonte vs nessun WP assegnato
+    const dated = days.filter(d => d.date && !isNaN(new Date(d.date + 'T12:00:00')));
+    const inRange = dated.filter(d => { const dd = new Date(d.date + 'T12:00:00'); return dd >= today && dd <= horizon; });
+    if (!dated.length) {
+      alert('Nessuna giornata ha una data valida.\nAssegna le date alle giornate (menu Giornate) per vedere le previsioni.');
+    } else if (!inRange.length) {
+      alert(`Le date delle giornate non rientrano nei prossimi ${WEATHER_MAX_DAYS} giorni (orizzonte delle previsioni Open-Meteo).`);
+    } else {
+      alert('Le giornate con data non hanno waypoint assegnati.\nClicca su un marker (o sul ✎ nella lista) e assegna il waypoint a una giornata.');
+    }
     return;
   }
   const btn = document.getElementById('btn-weather');
@@ -2919,7 +3080,7 @@ async function loadWeather() {
   weatherLayer.clearLayers();
   if (!map.hasLayer(weatherLayer)) weatherLayer.addTo(map);
   let ok = 0;
-  await Promise.all(tasks.map(async t => {
+  await mapPool(tasks, 4, async t => {
     const wx = await fetchWeather(t.wp.latlng.lat, t.wp.latlng.lng, t.day.date);
     if (!wx) return;
     ok++;
@@ -2936,7 +3097,7 @@ async function loadWeather() {
     const m = L.marker(t.wp.latlng, { icon, keyboard: false, zIndexOffset: -100 });
     m.bindTooltip(`G${t.day.number} · ${dateLabel} h12 — Vento ${Math.round(wx.speed)} kn (raffiche ${Math.round(wx.gust)}) da ${Math.round(wx.dir)}° ${degToCompass(wx.dir)}${waveStr}`);
     weatherLayer.addLayer(m);
-  }));
+  });
   logLine(ok ? `Meteo caricato: ${ok}/${tasks.length} punti (h 12:00 locali)` : 'Meteo non disponibile (rete? date troppo lontane?)', ok ? 'ok' : 'warn');
   btn.disabled = false;
 }
@@ -2960,6 +3121,9 @@ document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
     const t = e.target;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+    // Con un modale o il popup di edit aperti l'utente non sta lavorando sulla
+    // mappa: un undo qui eliminerebbe un waypoint senza che se ne accorga
+    if (document.querySelector('.modal-overlay.show') || document.querySelector('.leaflet-popup')) return;
     e.preventDefault();
     undoLast();
   }
