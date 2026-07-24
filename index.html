@@ -468,6 +468,9 @@
         <button class="success" id="btn-save-online" onclick="saveOnline()" style="flex:1">☁️ Salva online</button>
         <button id="btn-load-online" onclick="loadOnline()" style="flex:1">☁️ Carica online</button>
       </div>
+      <div style="text-align:right; margin-top:4px;">
+        <a href="#" onclick="resetGhToken(); return false;" style="color:#6b7280; font-size:11px;">reset token</a>
+      </div>
     </section>
   </div>
 </div>
@@ -1038,41 +1041,106 @@ function importArchive(input) {
   reader.readAsText(file);
 }
 
-// Salva l'archivio completo sul server condiviso (nginx su Unraid, PUT su
-// data/archivio.json). Notifica non bloccante su successo/errore/offline.
+// Fonte di verità dell'archivio: repo GitHub dariodv135/rotta-vela, branch main.
+const GH_REPO = 'dariodv135/rotta-vela';
+const GH_BRANCH = 'main';
+const GH_PATH = 'data/archivio.json';
+const LS_GH_TOKEN = LS_PREFIX + 'gh_token';
+
+// Credenziale GitHub per-dispositivo (fine-grained, Contents RW su rotta-vela).
+// Salvata solo in localStorage sul dispositivo, MAI nel codice. Ritorna il valore o null.
+function getGhToken() {
+  let tok = localStorage.getItem(LS_GH_TOKEN);
+  if (tok) return tok;
+  const ans = prompt('Incolla il token GitHub (fine-grained, repo rotta-vela, Contents RW):');
+  if (!ans) return null;
+  tok = ans.trim();
+  if (!tok) return null;
+  localStorage.setItem(LS_GH_TOKEN, tok);
+  return tok;
+}
+
+function resetGhToken() {
+  localStorage.removeItem(LS_GH_TOKEN);
+  showSaveStatus('✓ Token GitHub rimosso');
+}
+
+// Base64 UTF-8 safe per il payload dell'API Contents.
+function utf8ToBase64(str) {
+  return btoa(unescape(encodeURIComponent(str)));
+}
+
+// Salva l'archivio committandolo sul repo GitHub via API Contents.
+// Notifica non bloccante su successo/errore/offline.
 async function saveOnline() {
-  const all = buildArchive();
+  const token = getGhToken();
+  if (!token) { showSaveStatus('⚠ Token mancante', true); return; }
+  const jsonString = JSON.stringify(buildArchive(), null, 2);
+  const apiUrl = `https://api.github.com/repos/${GH_REPO}/contents/${GH_PATH}`;
+  const authHeaders = {
+    'Authorization': `Bearer ${token}`,
+    'Accept': 'application/vnd.github+json'
+  };
   try {
-    const res = await fetch('data/archivio.json', {
+    // Recupera lo sha del file esistente (404 = file nuovo, sha assente).
+    let sha;
+    const getRes = await fetch(`${apiUrl}?ref=${GH_BRANCH}`, { headers: authHeaders, cache: 'no-store' });
+    if (getRes.status === 401 || getRes.status === 403) {
+      showSaveStatus('⚠ Token non valido o scaduto', true); return;
+    }
+    if (getRes.ok) {
+      const meta = await getRes.json();
+      sha = meta.sha;
+    }
+    const payload = {
+      message: 'sync: archivio rotte da SailRouter',
+      content: utf8ToBase64(jsonString),
+      branch: GH_BRANCH
+    };
+    if (sha) payload.sha = sha;
+    const putRes = await fetch(apiUrl, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(all, null, 2)
+      headers: { ...authHeaders, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
     });
-    if (res.ok) {
+    if (putRes.ok) {
       const t = new Date();
       const hh = String(t.getHours()).padStart(2, '0');
       const mm = String(t.getMinutes()).padStart(2, '0');
-      showSaveStatus(`☁ Salvato online ${hh}:${mm}`);
+      showSaveStatus(`☁ Salvato su GitHub ${hh}:${mm}`);
+    } else if (putRes.status === 401 || putRes.status === 403) {
+      showSaveStatus('⚠ Token non valido o scaduto', true);
     } else {
-      showSaveStatus(`⚠ Salvataggio online fallito (${res.status})`, true);
+      showSaveStatus(`⚠ Salvataggio GitHub fallito (${putRes.status})`, true);
     }
   } catch (err) {
-    showSaveStatus('⚠ Salvataggio online non riuscito (offline?)', true);
+    showSaveStatus('⚠ Salvataggio GitHub non riuscito (offline?)', true);
   }
 }
 
-// Carica l'archivio condiviso dal server e applica le rotte con la stessa
-// logica dell'import da file (applyArchive). Notifica non bloccante su errore.
+// Carica l'archivio dal repo pubblico su GitHub (raw) e applica le rotte con
+// applyArchive. In errore di rete, fallback sulla copia locale del server.
 async function loadOnline() {
+  const rawUrl = `https://raw.githubusercontent.com/${GH_REPO}/${GH_BRANCH}/${GH_PATH}`;
   try {
-    const res = await fetch('data/archivio.json', { cache: 'no-store' });
-    if (!res.ok) { showSaveStatus(`⚠ Caricamento online fallito (${res.status})`, true); return; }
+    const res = await fetch(rawUrl, { cache: 'no-store' });
+    if (!res.ok) { showSaveStatus(`⚠ Caricamento GitHub fallito (${res.status})`, true); return; }
     const data = await res.json();
     const imported = applyArchive(data);
     if (imported === null) return;
-    showSaveStatus(`☁ Caricato dal server (${imported} rotte)`);
+    showSaveStatus(`☁ Caricato da GitHub (${imported} rotte)`);
   } catch (err) {
-    showSaveStatus('⚠ Caricamento online non riuscito (offline?)', true);
+    // Fallback: copia locale servita dal server (dv-server)
+    try {
+      const res = await fetch('data/archivio.json', { cache: 'no-store' });
+      if (!res.ok) { showSaveStatus('⚠ Caricamento non riuscito (GitHub e copia locale)', true); return; }
+      const data = await res.json();
+      const imported = applyArchive(data);
+      if (imported === null) return;
+      showSaveStatus(`☁ Caricato dalla copia locale del server (${imported} rotte)`);
+    } catch (err2) {
+      showSaveStatus('⚠ Caricamento non riuscito (GitHub e copia locale)', true);
+    }
   }
 }
 
@@ -3229,13 +3297,6 @@ window.addEventListener('load', () => {
     showSaveStatus('✓ Recuperato lavoro precedente');
   } else {
     updateAll();
-  }
-  // La sync online usa fetch relativo (data/archivio.json): non funziona da file://
-  if (location.protocol === 'file:') {
-    ['btn-save-online', 'btn-load-online'].forEach(id => {
-      const b = document.getElementById(id);
-      if (b) { b.disabled = true; b.title = 'Disponibile solo via server'; }
-    });
   }
 });
 
