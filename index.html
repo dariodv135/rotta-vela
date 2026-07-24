@@ -1389,8 +1389,10 @@ let editingWp = null;
 function openEditPopup(wp) {
   if (waypoints.indexOf(wp) < 0) return;
   // I popup sono bound con autoClose:false: senza chiusura esplicita del
-  // precedente ne resterebbero aperti due, con id DOM duplicati
-  if (editingWp && editingWp !== wp && editingWp.marker) editingWp.marker.closePopup();
+  // precedente ne resterebbero aperti due (anche ri-cliccando lo stesso marker,
+  // perché unbindPopup non chiude il popup già aperto)
+  if (editingWp && editingWp.marker) editingWp.marker.closePopup();
+  wp.marker.closePopup();
   editingWp = wp;
   const dayOptions = [
     `<option value="">— Nessuna —</option>`,
@@ -2979,6 +2981,8 @@ function importGPX(input) {
     if (waypoints.length && !confirm(`Importare ${parsed.length} punti? Waypoint e giornate attuali verranno sostituiti (la rotta è auto-salvata).`)) {
       input.value = ''; return;
     }
+    // Flush degli edit pendenti sulla rotta nominata (coerente con newRoute/loadRouteFromUI)
+    if (currentRouteName && isDirty) storage.saveRoute(currentRouteName);
     const stash = stashUnnamedRoute();
     // stashUnnamedRoute imposta currentRouteName al nome di recupero: va azzerato,
     // altrimenti l'autosave debounced del markDirty più sotto sovrascriverebbe lo
